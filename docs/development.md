@@ -83,16 +83,43 @@ make check-browser BROWSER=/path/to/chromium
 make check-layout BROWSER=/path/to/chromium
 ```
 
-`make check` builds firmware and runs native/model tests. Browser tests start
-isolated headless profiles against synthetic fixtures; they do not attach to
-personal tabs or a real ESP. Layout checks cover narrow/wide screens, scaling
-and enlarged text. These checks do not establish hardware behavior.
+`make check` builds firmware and runs host tests. Native API tests generate fresh
+responses before the JavaScript models validate them; missing responses fail the
+check. Test groups live in `tests/firmware/`, `tests/build/` and `tests/web/`;
+shared stubs, fixtures and browser helpers live in `tests/support/`.
+
+`make check-browser` runs application behavior, operation recovery and actual
+clipboard copy/paste checks. `make check-layout` owns the general screen-size,
+spacing and overlap sweep; terminal-specific geometry stays with terminal tests.
+Both use isolated headless profiles and synthetic fixtures, never personal tabs
+or a real ESP. They do not establish hardware behavior.
+
+Use the shared runner for a focused check:
+
+```sh
+.venv/bin/python tests/run.py build/test_build_version.py
+.venv/bin/python tests/run.py browser --suite serial --browser /path/to/chromium
+.venv/bin/python tests/run.py browser --suite recovery --browser /path/to/chromium
+.venv/bin/python tests/run.py browser --source --browser /path/to/chromium
+```
+
+Normal CI runs host tests for both release capacities and browser/layout tests
+once. Archive checks run after packaging. The separate-UI storage tests in
+`tests/experimental/` require their own build and remain outside release CI:
+
+```sh
+make check-experimental FLASH_SIZE=4MB SERIAL2WIFI_EXTERNAL_UI=1
+```
+
+Rebuild with `SERIAL2WIFI_EXTERNAL_UI=0` afterward for the normal release layout.
+All test output goes under ignored `.build-tests/`; browser failures retain
+screenshots and DOM snapshots there. Fixtures must contain synthetic data only.
 
 To inspect the UI locally:
 
 ```sh
 make ui
-.venv/bin/python tests/fixture_server.py --port 8765 --assets build/web
+.venv/bin/python tests/support/fixture_server.py --port 8765 --assets build/web
 ```
 
 Open the printed loopback URL. The fixture server rejects device writes. Use
@@ -170,8 +197,8 @@ Run the native and browser/layout checks above, then build both capacities:
 ```sh
 make release FLASH_SIZE=512KB VERSION=v0.1.0
 make release FLASH_SIZE=4MB VERSION=v0.1.0
-.venv/bin/python tests/test_release_archive.py dist/esp-serial2wifi-v0.1.0-512kb.tar.gz
-.venv/bin/python tests/test_release_archive.py dist/esp-serial2wifi-v0.1.0-4mb.tar.gz
+.venv/bin/python tests/run.py build/test_release_archive.py dist/esp-serial2wifi-v0.1.0-512kb.tar.gz
+.venv/bin/python tests/run.py build/test_release_archive.py dist/esp-serial2wifi-v0.1.0-4mb.tar.gz
 ```
 
 Each capacity archive has a matching `.sha256` file and contains its manifest, slot images,
@@ -183,7 +210,7 @@ Combine the two standard capacity archives into a single download:
 .venv/bin/python tools/build/package_release.py --combine \
   dist/esp-serial2wifi-v0.1.0-512kb.tar.gz \
   dist/esp-serial2wifi-v0.1.0-4mb.tar.gz --label v0.1.0
-.venv/bin/python tests/test_release_archive.py dist/esp-serial2wifi-v0.1.0.tar.gz
+.venv/bin/python tests/run.py build/test_release_archive.py dist/esp-serial2wifi-v0.1.0.tar.gz
 ```
 
 The combined archive has self-contained `512kb/` and `4mb/` folders, plus a short

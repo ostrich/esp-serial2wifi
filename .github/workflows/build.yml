@@ -78,7 +78,7 @@ jobs:
         run: |
           make release
           for archive in dist/*.tar.gz; do
-            .venv/bin/python tests/test_release_archive.py "$archive"
+            .venv/bin/python tests/run.py build/test_release_archive.py "$archive"
           done
           python3 - <<'PY'
           import json, os, subprocess
@@ -105,14 +105,14 @@ jobs:
         with:
           name: browser-failure-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
-            .build-tests/ui/*.json
-            .build-tests/ui/*.png
-            .build-tests/ui/*.html
-            .build-tests/ui/*.stderr
-            .build-tests/layout-ui/*.json
-            .build-tests/layout-ui/*.png
-            .build-tests/layout-ui/*.html
-            .build-tests/layout-ui/*.stderr
+            .build-tests/ui/**/*.json
+            .build-tests/ui/**/*.png
+            .build-tests/ui/**/*.html
+            .build-tests/ui/**/*.stderr
+            .build-tests/layout-ui/**/*.json
+            .build-tests/layout-ui/**/*.png
+            .build-tests/layout-ui/**/*.html
+            .build-tests/layout-ui/**/*.stderr
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7
@@ -148,7 +148,7 @@ jobs:
           export SOURCE_DATE_EPOCH
           python3 tools/build/package_release.py --combine dist/*.tar.gz --label "$label"
           archive="esp-serial2wifi-$label.tar.gz"
-          python3 tests/test_release_archive.py "dist/$archive"
+          python3 tests/run.py build/test_release_archive.py "dist/$archive"
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
       - name: Publish download
         env:

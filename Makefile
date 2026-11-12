@@ -61,10 +61,10 @@ ui:
 	$(PYTHON) tools/build/build_ui.py web
 
 check-browser:
-	$(PYTHON) tests/test_ui_browser.py --optimized --browser "$(BROWSER)"
+	$(PYTHON) tests/run.py browser --browser "$(BROWSER)"
 
 check-layout:
-	$(PYTHON) tests/test_ui_layout.py --browser "$(BROWSER)"
+	$(PYTHON) tests/run.py layout --browser "$(BROWSER)"
 
 help:
 	@echo "make setup                         Install local build inputs"

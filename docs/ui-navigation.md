@@ -5,7 +5,7 @@ profile. Tested widths: 360/768/1440 px; fractional DPI and 200% text are covere
 by the layout suite. Host versions for this run: Python 3.14.9 and Node.js 26.13.0.
 
 Use isolated loopback fixtures, not an attached device, for routine UI testing.
-Run `make ui`, then `.venv/bin/python tests/fixture_server.py --port 8765 --assets build/web`.
+Run `make ui`, then `.venv/bin/python tests/support/fixture_server.py --port 8765 --assets build/web`.
 Prefer the automated test commands in
 [development guide](development.md#test-and-develop-the-ui), which create their own server/profile and close them.
 

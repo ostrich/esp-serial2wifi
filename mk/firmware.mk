@@ -257,56 +257,10 @@ clean:
 
 -include $(OBJ:.o=.d)
 
-.PHONY: check
+.PHONY: check check-experimental
 check: all
-	$(Q) $(PYTHON) tests/test_build_version.py
-	$(Q) $(PYTHON) tests/test_public_defaults.py
-	$(Q) $(PYTHON) tests/test_flash_cli.py
-	$(Q) $(PYTHON) tests/test_flash_mcu.py
-	$(Q) $(PYTHON) tests/test_branding.py
-	$(Q) node tests/test_ui_client.mjs
-	$(Q) node tests/test_status_model.mjs
-	$(Q) node tests/test_network_model.mjs
-	$(Q) node tests/test_serial_model.mjs
-	$(Q) node tests/test_program_model.mjs
-	$(Q) node tests/test_update_model.mjs
-	$(Q) node tests/test_custom_page_lifecycle.mjs
-	$(Q) mkdir -p .build-tests
-	$(Q) gcc -std=c99 -Wall -Wextra -Wno-unused-parameter -fsanitize=address,undefined -Itests/uart-test-stubs -Iinclude -Isrc/core -Isrc/serial tests/test_uart_driver.c -o .build-tests/test-uart
-	$(Q) .build-tests/test-uart
-	$(Q) $(PYTHON) tests/test_serbridge_queue.py
-	$(Q) $(PYTHON) tests/test_sdk_rto.py --sdk "$(SDK_BASE)"
-	$(Q) $(PYTHON) tests/test_sdk_credit.py --sdk "$(SDK_BASE)"
-	$(Q) $(PYTHON) tests/test_sdk_transport_library.py --sdk "$(SDK_BASE)" --ar "$(AR)"
-	$(Q) $(PYTHON) tests/test_serbridge_input.py
-	$(Q) $(PYTHON) tests/test_rfc2217.py
-	$(Q) $(PYTHON) tests/test_console_stats.py
-	$(Q) $(PYTHON) tests/test_api_status.py
-	$(Q) $(PYTHON) tests/test_network_api.py
-	$(Q) $(PYTHON) tests/test_wifi_recovery.py
-	$(Q) $(PYTHON) tests/test_serial_api.py
-	$(Q) $(PYTHON) tests/test_management_api.py
-	$(Q) $(PYTHON) tests/test_backend_modules.py
-	$(Q) $(PYTHON) tests/test_log_api.py
-	$(Q) $(PYTHON) tests/test_updates_api.py
-	$(Q) $(PYTHON) tests/test_multipart.py
-	$(Q) $(PYTHON) tests/test_page_menu.py
-	$(Q) $(PYTHON) tests/test_web_assets.py
-	$(Q) $(PYTHON) tests/test_programming_records.py
-	$(Q) $(PYTHON) tests/test_optiboot_protocol.py
-	$(Q) $(PYTHON) tests/test_optiboot_readback.py
-	$(Q) $(PYTHON) tests/test_optiboot_http.py
-	$(Q) $(PYTHON) tests/test_httpd_send_lifetime.py
-	$(Q) $(PYTHON) tests/test_httpd_headers.py
-	$(Q) $(PYTHON) tests/test_project_boundary.py
-	$(Q) $(PYTHON) tests/test_wiflash.py
-	$(Q) $(PYTHON) tests/test_config.py
-	$(Q) $(PYTHON) tests/test_gen_appbin.py
-	$(Q) $(PYTHON) tests/test_flash_layout.py
-	$(Q) $(PYTHON) tests/test_startup.py
-	$(Q) $(PYTHON) tests/test_ota_preflight.py
-	$(Q) $(PYTHON) tests/test_fixture_server.py
-ifeq ($(FLASH_SIZE),4MB)
-	$(Q) $(PYTHON) tests/test_firmware_image.py
-	$(Q) $(PYTHON) tests/test_ota.py
-endif
+	$(Q) $(PYTHON) tests/run.py host --flash "$(FLASH_SIZE)" --sdk "$(SDK_BASE)" --ar "$(AR)"
+
+check-experimental: all
+	@test "$(SERIAL2WIFI_EXTERNAL_UI)" = 1 || { echo 'Use make check-experimental SERIAL2WIFI_EXTERNAL_UI=1'; exit 1; }
+	$(Q) $(PYTHON) tests/run.py experimental
