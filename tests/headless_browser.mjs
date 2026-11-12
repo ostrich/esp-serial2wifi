@@ -10,24 +10,34 @@ export async function launch(browser, output) {
     '--no-default-browser-check', '--disable-background-networking', '--disable-extensions',
     '--disable-component-update', '--remote-debugging-address=127.0.0.1',
     '--remote-debugging-port=0', '--user-data-dir='+profile, 'about:blank'], {stdio:['ignore','ignore','pipe']});
+  let stopped=false, launchError;
+  const closed=new Promise(resolve=>{
+    process.once('close',()=>{stopped=true;resolve();});
+    process.once('error',error=>{launchError=error;});
+  });
   let diagnostics = ''; process.stderr.on('data', chunk => { diagnostics = (diagnostics+chunk).slice(-65536); });
   let socket, sequence = 0; const pending = new Map(), handlers = new Map();
   const close = async () => {
     socket?.close();
     for (const entry of pending.values()) { clearTimeout(entry.timer); entry.reject(new Error('Browser closed')); }
     pending.clear();
-    if (process.exitCode === null) {
+    if (!stopped) {
       process.kill('SIGTERM');
-      await Promise.race([new Promise(resolve=>process.once('exit',resolve)), sleep(2000)]);
-      if (process.exitCode === null) process.kill('SIGKILL');
+      await Promise.race([closed,sleep(2000)]);
+      if (!stopped) {
+        process.kill('SIGKILL');
+        await Promise.race([closed,sleep(2000)]);
+      }
     }
     await writeFile(join(output,'browser.stderr'), diagnostics);
-    await rm(profile,{recursive:true,force:true});
+    if (!stopped) throw new Error('Browser shutdown timed out; retained profile: '+profile);
+    await rm(profile,{recursive:true,force:true,maxRetries:5,retryDelay:100});
   };
   try {
     let port;
     for (let i=0;i<200;i++) {
-      if (process.exitCode !== null) throw new Error('Isolated browser exited before readiness');
+      if (launchError) throw launchError;
+      if (stopped || process.exitCode !== null || process.signalCode !== null) throw new Error('Isolated browser exited before readiness');
       try { port = Number((await readFile(join(profile,'DevToolsActivePort'),'utf8')).split('\n')[0]); break; } catch (_) { await sleep(50); }
     }
     if (!port) throw new Error('Browser debugging endpoint did not become ready');
