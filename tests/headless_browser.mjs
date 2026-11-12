@@ -35,10 +35,15 @@ export async function launch(browser, output) {
   };
   try {
     let port;
-    for (let i=0;i<200;i++) {
+    const startupDeadline=Date.now()+30000;
+    while (Date.now()<startupDeadline) {
       if (launchError) throw launchError;
       if (stopped || process.exitCode !== null || process.signalCode !== null) throw new Error('Isolated browser exited before readiness');
-      try { port = Number((await readFile(join(profile,'DevToolsActivePort'),'utf8')).split('\n')[0]); break; } catch (_) { await sleep(50); }
+      try {
+        const candidate=Number((await readFile(join(profile,'DevToolsActivePort'),'utf8')).split('\n')[0]);
+        if (Number.isInteger(candidate) && candidate>0 && candidate<=65535) { port=candidate;break; }
+      } catch (_) {}
+      await sleep(50);
     }
     if (!port) throw new Error('Browser debugging endpoint did not become ready');
     const targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
