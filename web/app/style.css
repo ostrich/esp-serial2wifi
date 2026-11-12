@@ -331,6 +331,7 @@ legend {
   padding:0 .4rem
 }
 label {
+  overflow-wrap:anywhere;
   display:block;
   margin-bottom:.35rem
 }

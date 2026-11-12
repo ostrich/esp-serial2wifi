@@ -40,5 +40,10 @@ try{
    }
   }
  }
+ // A wider fallback font must not let long checkbox labels escape their grid cell.
+ await page.evaluate("location.hash='#/integrations'");await page.wait("document.querySelector('#management-mqtt')?.dataset.state==='clean'");
+ await page.evaluate("document.querySelector('main').style.scrollbarGutter='stable';for(const d of document.querySelectorAll('#view details'))d.open=true;for(const label of document.querySelectorAll('#view label'))label.style.fontFamily='monospace'");
+ assert.equal(await page.evaluate("[...document.querySelectorAll('#view label')].every(e=>e.scrollWidth<=e.clientWidth+1)"),true,'Large checkbox labels must wrap with wider fallback fonts');
+ assert.equal((await page.evaluate(`(${inspect})()`)).overflow,false,'Fallback font must not cause page overflow');
  assert.deepEqual(errors,[]);await writeFile(output+'/result.json',JSON.stringify({pass:true,cases:results},null,2));console.log('PASS all eight screens: 64 collapsed/expanded layout cases, 360/768/1440px, fractional DPI and 200% text; no overlaps or horizontal page overflow');
 }catch(e){await writeFile(output+'/result.json',JSON.stringify({pass:false,cases:results,errors},null,2));await page.screenshot('failure.png');throw e;}finally{await page.close();}
