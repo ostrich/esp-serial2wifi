@@ -13,7 +13,7 @@ permissions:
 
 concurrency:
   group: firmware-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -84,7 +84,7 @@ jobs:
         shell: bash
         run: |
           make release
-          for archive in dist/*.tgz; do
+          for archive in dist/*.tar.gz; do
             .venv/bin/python tests/test_release_archive.py "$archive"
           done
           python3 - <<'PY'
@@ -101,8 +101,8 @@ jobs:
         with:
           name: firmware-${{ steps.version.outputs.version }}-${{ matrix.capacity }}
           path: |
-            dist/*.tgz
-            dist/*.tgz.sha256
+            dist/*.tar.gz
+            dist/*.tar.gz.sha256
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -125,32 +125,77 @@ jobs:
           retention-days: 7
 
   release:
-    name: Publish tagged release
-    if: github.event_name == 'push' && github.ref_type == 'tag'
+    name: Publish release download
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/master')
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Download verified firmware
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: firmware-*
           path: dist
           merge-multiple: true
-      - name: Publish archives and checksums
+      - name: Combine and verify both capacities
+        id: bundle
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            label="$GITHUB_REF_NAME"
+          else
+            label="${GITHUB_SHA:0:8}"
+          fi
+          SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)
+          export SOURCE_DATE_EPOCH
+          python3 tools/build/package_release.py --combine dist/*.tar.gz --label "$label"
+          archive="esp-serial2wifi-$label.tar.gz"
+          python3 tests/test_release_archive.py "dist/$archive"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+      - name: Publish download
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ github.ref_name }}
+          ARCHIVE: ${{ steps.bundle.outputs.archive }}
         shell: bash
         run: |
-          cd dist
-          test -f "esp-serial2wifi-$TAG-512kb.tgz"
-          test -f "esp-serial2wifi-$TAG-4mb.tgz"
-          sha256sum --check --strict ./*.tgz.sha256
-          args=()
-          if [[ "$TAG" == *-* ]]; then args+=(--prerelease); fi
-          gh release create "$TAG" ./*.tgz ./*.tgz.sha256 \
-            --verify-tag --title "ESP Serial2WiFi $TAG" --generate-notes "${args[@]}"
+          cat > release-notes.md <<EOF
+          One download contains firmware for **both 512 KB and 4 MB ESP8266 boards**.
+          Extract the archive and open the README in the folder matching your board:
+          **512kb/** for serial flashing, or **4mb/** for serial flashing and OTA.
+
+          For a compatible 4 MB device, upload the application image for the target
+          slot shown on its Firmware page. Normal OTA updates preserve settings;
+          factory installation erases them. Put the attached serial device in a
+          safe state before restarting the ESP because it sends UART boot bytes.
+
+          Source: [$GITHUB_SHA](https://github.com/$GH_REPO/commit/$GITHUB_SHA).
+          Built and tested in [GitHub Actions](https://github.com/$GH_REPO/actions/runs/$GITHUB_RUN_ID).
+          EOF
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            args=()
+            if [[ "$GITHUB_REF_NAME" == *-* ]]; then args+=(--prerelease --latest=false); else args+=(--latest); fi
+            gh release create "$GITHUB_REF_NAME" "dist/$ARCHIVE" "dist/$ARCHIVE.sha256" \
+              --verify-tag --title "ESP Serial2WiFi $GITHUB_REF_NAME" --notes-file release-notes.md "${args[@]}"
+          else
+            printf '%s\n\n' 'Automated development build from the latest successful master commit. Downloads are replaced after each successful master build.' > master-notes.md
+            cat release-notes.md >> master-notes.md
+            if gh release view master-build >/dev/null 2>&1; then
+              gh release upload master-build "dist/$ARCHIVE" "dist/$ARCHIVE.sha256" --clobber
+              gh api --method PATCH "repos/$GH_REPO/git/refs/tags/master-build" -f sha="$GITHUB_SHA" -F force=true
+              gh release edit master-build --title 'Latest master build' --notes-file master-notes.md --prerelease --latest=false
+              while IFS= read -r asset; do
+                if [[ "$asset" == esp-serial2wifi-* && "$asset" != "$ARCHIVE" && "$asset" != "$ARCHIVE.sha256" ]]; then
+                  gh release delete-asset master-build "$asset" --yes
+                fi
+              done < <(gh release view master-build --json assets --jq '.assets[].name')
+            else
+              gh release create master-build "dist/$ARCHIVE" "dist/$ARCHIVE.sha256" \
+                --target "$GITHUB_SHA" --title 'Latest master build' --notes-file master-notes.md --prerelease --latest=false
+            fi
+          fi

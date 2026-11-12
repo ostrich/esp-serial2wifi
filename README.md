@@ -26,8 +26,10 @@ make FLASH_SIZE=4MB
 Use `FLASH_SIZE=512KB` for a 512 KB board. Setup installs dependencies inside the
 checkout and downloads the pinned SDK/compiler. Images appear in `firmware/`.
 See the [development guide](docs/development.md) for host setup, tests and releases.
-GitHub Actions builds both capacities on every push to `master`; version tags
-publish release archives automatically.
+Download firmware from [Releases](https://github.com/ostrich/esp-serial2wifi/releases).
+Each `.tar.gz` contains separate `512kb/` and `4mb/` folders with installation
+instructions. **Latest master build** is the rolling development prerelease;
+versioned releases are the stable downloads. Both are built automatically.
 
 ## Install and use
 

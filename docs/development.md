@@ -159,14 +159,26 @@ Run the native and browser/layout checks above, then build both capacities:
 ```sh
 make release FLASH_SIZE=512KB VERSION=v0.1.0
 make release FLASH_SIZE=4MB VERSION=v0.1.0
-.venv/bin/python tests/test_release_archive.py dist/esp-serial2wifi-v0.1.0-512kb.tgz
-.venv/bin/python tests/test_release_archive.py dist/esp-serial2wifi-v0.1.0-4mb.tgz
+.venv/bin/python tests/test_release_archive.py dist/esp-serial2wifi-v0.1.0-512kb.tar.gz
+.venv/bin/python tests/test_release_archive.py dist/esp-serial2wifi-v0.1.0-4mb.tar.gz
 ```
 
-Each archive has a matching `.sha256` file and contains its manifest, slot images,
+Each capacity archive has a matching `.sha256` file and contains its manifest, slot images,
 boot/SDK initialization files, flashing tools and license notices. Its installation
 README comes from `tools/templates/release_readme.md`. Never combine files across builds.
-Check manifest/version/tag agreement and report physical-device testing separately.
+Combine the two standard capacity archives into a single download:
+
+```sh
+.venv/bin/python tools/build/package_release.py --combine \
+  dist/esp-serial2wifi-v0.1.0-512kb.tar.gz \
+  dist/esp-serial2wifi-v0.1.0-4mb.tar.gz --label v0.1.0
+.venv/bin/python tests/test_release_archive.py dist/esp-serial2wifi-v0.1.0.tar.gz
+```
+
+The combined archive has self-contained `512kb/` and `4mb/` folders, plus a short
+README explaining which to use. Combining rejects mismatched revisions, versions,
+SDK inputs or checksums. Check manifest/version/tag agreement and report physical-device
+testing separately.
 
 Packaging fixes file order, permissions, owner IDs and timestamps
 (`SOURCE_DATE_EPOCH`, default 0). Repacking unchanged inputs produces identical
@@ -177,8 +189,11 @@ archives; compare actual artifacts before claiming reproducibility across hosts.
 Pushes to `master`, pull requests to `master`, and manual Actions runs build both
 capacities. Each build runs host tests and archive checks; the 4 MB job also runs
 the browser and layout suites. Download firmware from the run’s **Artifacts**
-section. Development versions include the short commit ID, and artifacts expire
-after 14 days.
+section; those artifacts expire after 14 days. Successful master builds also
+refresh the **Latest master build** prerelease on the repository’s Releases page.
+Its download is `esp-serial2wifi-<8-character-commit>.tar.gz`, plus a SHA-256 file.
+The `master-build` tag moves to that commit and old development downloads are
+removed. Development firmware versions include the commit ID.
 
 To publish a release, push a version tag on the intended commit:
 
@@ -188,10 +203,13 @@ git push origin v0.1.0
 ```
 
 Use a new tag for each release. After both builds pass, the workflow creates a
-GitHub release with the two firmware archives and their SHA-256 files. The tag
+GitHub release with `esp-serial2wifi-v0.1.0.tar.gz` (both capacities) and its
+SHA-256 file. The tag
 sets the firmware version; update the Makefile default when starting a new version.
 Tags with a suffix, such as `v0.1.1-rc1`, produce prereleases. Failed builds do not
-publish, and reruns do not overwrite an existing release.
+publish. Versioned releases are not overwritten; the master prerelease is replaced
+after successful master builds. Stable releases remain marked as latest even
+when a newer development prerelease is published.
 
 The workflow uses pinned actions, Python 3.12 and Node.js 22 on x86-64 Ubuntu.
 Only the publication job has repository write access. SDK archives and package
