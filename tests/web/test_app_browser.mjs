@@ -21,7 +21,11 @@ const scenario=async (mode,route='/api/v1/status',response)=>{
 };
 const refresh=()=>page.evaluate("document.querySelector('#refresh').click()");
 const noOverflow=async()=>assert.equal(await run(()=>document.documentElement.scrollWidth<=innerWidth),true);
-const viewport=async width=>page.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width===360});
+const viewport=async width=>{
+ await page.send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:width===360});
+ // Let media-query change handlers and layout finish before focusing or typing.
+ await run(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+};
 const exceptions=[];page.on('Runtime.exceptionThrown',params=>exceptions.push(params.exceptionDetails.text));
 try {
  if(['management','updates','serial','network','branding'].includes(values.suite)){
