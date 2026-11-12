@@ -80,7 +80,7 @@ help:
 
 .PHONY: format check-format
 format:
-	$(PYTHON) tools/format.py
+	$(PYTHON) tools/build/format.py
 
 check-format:
-	$(PYTHON) tools/format.py --check
+	$(PYTHON) tools/build/format.py --check
