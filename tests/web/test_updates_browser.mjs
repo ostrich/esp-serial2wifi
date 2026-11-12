@@ -40,12 +40,12 @@ export async function testUpdatesBrowser({page,run,check,viewport,noOverflow}){
   assert.equal(await run(()=>document.querySelector('#update-form').hidden),true);
   assert.equal(await run(()=>document.querySelector('#update-activation').hidden),true);
   assert.match(await run(()=>document.querySelector('#update-state').textContent),/serial/i);
-  
+
  });
  await check('Firmware transfer, explicit activation and post-boot identity are distinct',async()=>{
   await run(()=>{window.__updatesTest.firmware.ota_supported=true;window.__updatesTest.firmware.reason=null;document.querySelector('#view button').click();});
   await page.wait("!document.querySelector('#update-form').hidden");
-  
+
   await run(()=>{const b=new Uint8Array(1028),v=new DataView(b.buffer);b.set([0xea,4,0,1]);v.setUint32(4,0x40100000,true);v.setUint32(12,16,true);b.set(new TextEncoder().encode('ELSDK306-MAP4-CFG1'),32);const dt=new DataTransfer();dt.items.add(new File([b],'user2.bin'));const input=document.querySelector('#update-files');input.files=dt.files;input.dispatchEvent(new Event('change'));});
   await page.wait("document.querySelector('#update-file-state').textContent.includes('Header and layout checks passed')");
   await run(()=>{document.querySelector('#update-version').value='esp-serial2wifi expected';const c=document.querySelector('#update-replace-confirm');c.checked=true;c.dispatchEvent(new Event('change'));document.querySelector('#update-form').requestSubmit();});
@@ -87,7 +87,7 @@ export async function testUpdatesBrowser({page,run,check,viewport,noOverflow}){
   assert.equal(await run(()=>window.__updatesTest.uploads),posts);
   await run(()=>document.querySelector('#custom-page-help').open=false);
 
-  
+
   await run(()=>{const dt=new DataTransfer();dt.items.add(new File(['<p>fragment</p>'],'panel.html'));dt.items.add(new File([new Uint8Array([0,255,13,10])],'bytes.bin'));const input=document.querySelector('#update-files');input.files=dt.files;input.dispatchEvent(new Event('change'));});
   await page.wait("document.querySelector('#update-file-state').textContent.includes('Capacity and filename checks passed')");
   await run(()=>{window.__updatesTest.fail=true;const c=document.querySelector('#update-replace-confirm');c.checked=true;c.dispatchEvent(new Event('change'));document.querySelector('#update-form').requestSubmit();});
