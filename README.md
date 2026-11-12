@@ -23,6 +23,9 @@ make setup
 make FLASH_SIZE=4MB
 ```
 
+The firmware identifies the release tag or Git commit it was built from;
+uncommitted source changes add `-dirty`. Use `VERSION=...` to override it.
+
 Use `FLASH_SIZE=512KB` for a 512 KB board. Setup installs dependencies inside the
 checkout and downloads the pinned SDK/compiler. Images appear in `firmware/`.
 See the [development guide](docs/development.md) for host setup, tests and releases.

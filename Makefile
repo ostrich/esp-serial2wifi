@@ -3,7 +3,17 @@
 .NOTPARALLEL:
 -include config.mk
 
-VERSION ?= v0.1.0
+# Explicit VERSION values win; builds otherwise identify their actual Git source.
+ifeq ($(origin VERSION),undefined)
+ifneq ($(filter-out setup help clean ui check-browser check-layout,$(or $(MAKECMDGOALS),all)),)
+VERSION := $(shell python3 tools/build/write_config.py --print-version)
+ifneq ($(.SHELLSTATUS),0)
+$(error Cannot determine firmware version; supply VERSION=... when building without Git metadata)
+endif
+else
+VERSION := unversioned
+endif
+endif
 FLASH_SIZE ?= 4MB
 TOOLS_DIR ?= $(abspath .cache/esp8266)
 SDK_BASE ?= $(TOOLS_DIR)/ESP8266_NONOS_SDK-3.0.6

@@ -49,27 +49,15 @@ jobs:
         id: version
         shell: bash
         run: |
-          python3 - <<'PY'
-          import os, re, subprocess
-          from pathlib import Path
-          base = re.search(r'^VERSION\s*\?=\s*(\S+)', Path('Makefile').read_text(), re.M)[1]
-          if os.environ['GITHUB_REF_TYPE'] == 'tag':
-              version = os.environ['GITHUB_REF_NAME']
-              if not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?', version):
-                  raise SystemExit('Release tags must look like v0.1.0 or v0.1.1-rc1')
-          else:
-              tags = subprocess.check_output(['git', 'tag', '--merged', 'HEAD'], text=True).splitlines()
-              stable = [tag for tag in tags if re.fullmatch(r'v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)', tag)]
-              if stable:
-                  base = max(stable, key=lambda tag: tuple(map(int, tag[1:].split('.'))))
-              revision = subprocess.check_output(['git', 'rev-parse', '--short=8', 'HEAD'], text=True).strip()
-              version = base + '-dev.' + revision
-          stamp = subprocess.check_output(['git', 'show', '-s', '--format=%ct', 'HEAD'], text=True).strip()
-          with open(os.environ['GITHUB_ENV'], 'a') as out:
-              out.write(f'VERSION={version}\nSOURCE_DATE_EPOCH={stamp}\n')
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
-              out.write(f'version={version}\n')
-          PY
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            version=$(python3 tools/build/write_config.py --print-version --tag "$GITHUB_REF_NAME")
+          else
+            version=$(python3 tools/build/write_config.py --print-version --development)
+          fi
+          stamp=$(git show -s --format=%ct HEAD)
+          printf 'VERSION=%s\nSOURCE_DATE_EPOCH=%s\n' "$version" "$stamp" >> "$GITHUB_ENV"
+          printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+
       - name: Set up dependencies
         run: make setup
       - name: Build and run host tests

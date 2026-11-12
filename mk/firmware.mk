@@ -259,6 +259,7 @@ clean:
 
 .PHONY: check
 check: all
+	$(Q) $(PYTHON) tests/test_build_version.py
 	$(Q) $(PYTHON) tests/test_public_defaults.py
 	$(Q) $(PYTHON) tests/test_flash_cli.py
 	$(Q) $(PYTHON) tests/test_flash_mcu.py

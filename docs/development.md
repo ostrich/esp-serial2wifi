@@ -50,8 +50,19 @@ make FLASH_SIZE=512KB VERSION=v0.1.1-dev1
 
 Command-line options apply to that invocation only. In particular, pass the
 capacity again when invoking a flash target. Set Wi-Fi credentials in the UI,
-not in public builds. `VERSION` defaults to `v0.1.0` in `Makefile`; the manifest
-records Git revision and source hashes separately.
+not in public builds. Local builds identify their Git source automatically:
+
+- At a release tag: `esp-serial2wifi v0.1.0`.
+- After a release: `esp-serial2wifi v0.1.0-dev.<commit>`.
+- Without a reachable stable tag: `esp-serial2wifi dev.<commit>`.
+- With tracked edits or unignored new files: append `-dirty`.
+
+Generated files and other Git-ignored files do not mark a build dirty. The base
+is the highest reachable stable release tag; shallow clones may need
+`git fetch --unshallow --tags` to find it. Without Git metadata (for example, a
+source archive), pass `VERSION=...` explicitly. That override also works in a
+Git checkout. The manifest records the full revision and source hashes separately.
+Local builds and CI share the logic in `tools/build/write_config.py`.
 
 Standard builds use DIO/40 MHz flash and embedded xterm 5.5. Debug traces can be
 enabled with `SERIAL2WIFI_DEBUG=1`, which consumes additional space. The
@@ -197,8 +208,7 @@ removed. Development firmware versions use the highest stable `vX.Y.Z` tag
 reachable from the built commit, followed by `-dev.<commit>`. For example, after
 `v0.2.0` is tagged on master, subsequent master builds report
 `esp-serial2wifi v0.2.0-dev.<commit>`. Prerelease tags and the rolling `master-build`
-tag do not affect this base. Before any stable tag exists, the Makefile default
-is used. Pushing a tag does not rebuild an already published master download;
+tag do not affect this base. Before any stable tag exists, versions use `dev.<commit>`. Pushing a tag does not rebuild an already published master download;
 the next master push or manual master workflow run picks it up.
 
 To publish a release, push a version tag on the intended commit:
@@ -211,7 +221,8 @@ git push origin v0.1.0
 Use a new tag for each release. After both builds pass, the workflow creates a
 GitHub release with `esp-serial2wifi-v0.1.0.tar.gz` (both capacities) and its
 SHA-256 file. The tag
-sets the firmware version. The Makefile default controls local builds only.
+sets the firmware version. Master CI builds always include the commit ID, even
+when the commit also has a release tag.
 Tags with a suffix, such as `v0.1.1-rc1`, produce prereleases. Failed builds do not
 publish. Versioned releases are not overwritten; the master prerelease is replaced
 after successful master builds. Stable releases remain marked as latest even
