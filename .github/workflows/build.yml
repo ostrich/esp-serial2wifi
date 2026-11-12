@@ -114,8 +114,12 @@ jobs:
           path: |
             .build-tests/ui/*.json
             .build-tests/ui/*.png
+            .build-tests/ui/*.html
+            .build-tests/ui/*.stderr
             .build-tests/layout-ui/*.json
             .build-tests/layout-ui/*.png
+            .build-tests/layout-ui/*.html
+            .build-tests/layout-ui/*.stderr
           include-hidden-files: true
           if-no-files-found: ignore
           retention-days: 7

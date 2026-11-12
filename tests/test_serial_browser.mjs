@@ -60,13 +60,14 @@ export async function testSerialBrowser({page,run,check,viewport,noOverflow}){
   assert.equal(await run(()=>document.querySelectorAll('.terminal-toolbar button').length),1);
   assert.equal(await run(()=>document.querySelector('#serial-terminal-toggle').textContent),'Pause terminal');
   await page.wait("document.querySelector('#serial-terminal-state').textContent.includes('Serial port in use')");
-  await run(()=>{const original=window.Terminal.prototype.write;window.__originalReplayWrite=original;window.Terminal.prototype.write=function(bytes,callback){const text=typeof bytes==='string'?bytes:new TextDecoder().decode(bytes);return original.call(this,bytes,text.includes('history-tail')?()=>{window.__serialTest.finishReplay=callback;}:callback);};window.__serialTest.config.clients=0;});
+  await run(()=>{const original=window.Terminal.prototype.write;window.__originalReplayWrite=original;window.Terminal.prototype.write=function(bytes,callback){window.__serialTest.replayTerminal=this;const text=typeof bytes==='string'?bytes:new TextDecoder().decode(bytes);return original.call(this,bytes,text.includes('history-tail')?()=>{window.__serialTest.finishReplay=callback;}:callback);};window.__serialTest.config.clients=0;});
   await page.wait("typeof window.__serialTest.finishReplay==='function'",8000);
   assert.equal(await run(()=>document.querySelector('#terminal-unix-send').disabled),true);
   await run(()=>{document.querySelector('#serial-terminal textarea').focus();window.__serialTest.emit('handoff-live-1\r\nhandoff-live-2');});await page.key('Enter');
   await page.wait("document.querySelector('#serial-terminal .xterm-rows').textContent.includes('handoff-live-2')");
   assert.equal(await run(()=>window.__serialTest.posts.length),0);
-  assert.equal(await run(()=>document.querySelector('#serial-terminal .xterm-rows').textContent.split('handoff-live-1').length-1),1);
+  // Visible rows may be mid-paint or scrolled; byte delivery is a buffer property.
+  assert.equal(await run(()=>{const b=window.__serialTest.replayTerminal.buffer.active;return Array.from({length:b.length},(_,i)=>b.getLine(i).translateToString(true)).join('\n').split('handoff-live-1').length-1;}),1);
   await run(()=>{window.Terminal.prototype.write=window.__originalReplayWrite;window.__serialTest.finishReplay();});
   await page.wait("document.querySelector('.live-console').dataset.state==='live' && !!window.__serialTest.stream",8000);
   const opens=await run(()=>window.__serialTest.liveOpens);
