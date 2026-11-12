@@ -172,11 +172,31 @@ Packaging fixes file order, permissions, owner IDs and timestamps
 (`SOURCE_DATE_EPOCH`, default 0). Repacking unchanged inputs produces identical
 archives; compare actual artifacts before claiming reproducibility across hosts.
 
-There is no GitHub Actions workflow yet. A future workflow can run these commands
-on x86-64 Linux with a `512KB`/`4MB` matrix, using the tag as `VERSION`. Cache SDK
-archives and npm/pip downloads, not firmware outputs or relocated virtualenvs.
-Publish only the matching archives/checksums after checks pass; hardware flashing
-must remain a separate operation.
+### GitHub Actions
+
+Pushes to `master`, pull requests to `master`, and manual Actions runs build both
+capacities. Each build runs host tests and archive checks; the 4 MB job also runs
+the browser and layout suites. Download firmware from the run’s **Artifacts**
+section. Development versions include the short commit ID, and artifacts expire
+after 14 days.
+
+To publish a release, push a version tag on the intended commit:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Use a new tag for each release. After both builds pass, the workflow creates a
+GitHub release with the two firmware archives and their SHA-256 files. The tag
+sets the firmware version; update the Makefile default when starting a new version.
+Tags with a suffix, such as `v0.1.1-rc1`, produce prereleases. Failed builds do not
+publish, and reruns do not overwrite an existing release.
+
+The workflow uses pinned actions, Python 3.12 and Node.js 22 on x86-64 Ubuntu.
+Only the publication job has repository write access. SDK archives and package
+downloads are cached; firmware outputs and virtual environments are rebuilt.
+CI never contacts or flashes an ESP; hardware testing remains separate.
 
 ## Source and dependencies
 

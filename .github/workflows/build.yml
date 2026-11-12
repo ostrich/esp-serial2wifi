@@ -1,0 +1,152 @@
+name: Build firmware
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firmware-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  build:
+    name: Build and test ${{ matrix.capacity }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        capacity: [512KB, 4MB]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-*.txt
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Cache pinned SDK downloads
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/esp8266/*.tar.gz
+            .cache/esp8266/*.tgx
+          key: sdk-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('sdk-lock.json') }}
+      - name: Set build version
+        id: version
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, re, subprocess
+          from pathlib import Path
+          base = re.search(r'^VERSION\s*\?=\s*(\S+)', Path('Makefile').read_text(), re.M)[1]
+          if os.environ['GITHUB_REF_TYPE'] == 'tag':
+              version = os.environ['GITHUB_REF_NAME']
+              if not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?', version):
+                  raise SystemExit('Release tags must look like v0.1.0 or v0.1.1-rc1')
+          else:
+              revision = subprocess.check_output(['git', 'rev-parse', '--short=8', 'HEAD'], text=True).strip()
+              version = base + '-dev.' + revision
+          stamp = subprocess.check_output(['git', 'show', '-s', '--format=%ct', 'HEAD'], text=True).strip()
+          with open(os.environ['GITHUB_ENV'], 'a') as out:
+              out.write(f'VERSION={version}\nSOURCE_DATE_EPOCH={stamp}\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f'version={version}\n')
+          PY
+      - name: Set up dependencies
+        run: make setup
+      - name: Build and run host tests
+        env:
+          FLASH_SIZE: ${{ matrix.capacity }}
+        run: make check
+      - name: Test browser workflows and layouts
+        if: matrix.capacity == '4MB'
+        shell: bash
+        run: |
+          browser=$(command -v google-chrome)
+          make check-browser BROWSER="$browser"
+          make check-layout BROWSER="$browser"
+      - name: Package and verify firmware
+        env:
+          FLASH_SIZE: ${{ matrix.capacity }}
+        shell: bash
+        run: |
+          make release
+          for archive in dist/*.tgz; do
+            .venv/bin/python tests/test_release_archive.py "$archive"
+          done
+          python3 - <<'PY'
+          import json, os, subprocess
+          from pathlib import Path
+          manifest = json.loads(Path('firmware/release-manifest.json').read_text())
+          assert manifest['version'] == os.environ['VERSION']
+          assert manifest['geometry']['target'] == os.environ['FLASH_SIZE']
+          assert manifest['source_revision'] == subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          assert manifest['ui']['storage'] == 'embedded'
+          PY
+      - name: Upload firmware archives
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: firmware-${{ steps.version.outputs.version }}-${{ matrix.capacity }}
+          path: |
+            dist/*.tgz
+            dist/*.tgz.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Upload browser failure evidence
+        if: failure() && matrix.capacity == '4MB'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .build-tests/ui/*.json
+            .build-tests/ui/*.png
+            .build-tests/layout-ui/*.json
+            .build-tests/layout-ui/*.png
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+
+  release:
+    name: Publish tagged release
+    if: github.event_name == 'push' && github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified firmware
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: firmware-*
+          path: dist
+          merge-multiple: true
+      - name: Publish archives and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          cd dist
+          test -f "esp-serial2wifi-$TAG-512kb.tgz"
+          test -f "esp-serial2wifi-$TAG-4mb.tgz"
+          sha256sum --check --strict ./*.tgz.sha256
+          args=()
+          if [[ "$TAG" == *-* ]]; then args+=(--prerelease); fi
+          gh release create "$TAG" ./*.tgz ./*.tgz.sha256 \
+            --verify-tag --title "ESP Serial2WiFi $TAG" --generate-notes "${args[@]}"
