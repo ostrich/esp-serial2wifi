@@ -193,7 +193,13 @@ section; those artifacts expire after 14 days. Successful master builds also
 refresh the **Latest master build** prerelease on the repository’s Releases page.
 Its download is `esp-serial2wifi-<8-character-commit>.tar.gz`, plus a SHA-256 file.
 The `master-build` tag moves to that commit and old development downloads are
-removed. Development firmware versions include the commit ID.
+removed. Development firmware versions use the highest stable `vX.Y.Z` tag
+reachable from the built commit, followed by `-dev.<commit>`. For example, after
+`v0.2.0` is tagged on master, subsequent master builds report
+`esp-serial2wifi v0.2.0-dev.<commit>`. Prerelease tags and the rolling `master-build`
+tag do not affect this base. Before any stable tag exists, the Makefile default
+is used. Pushing a tag does not rebuild an already published master download;
+the next master push or manual master workflow run picks it up.
 
 To publish a release, push a version tag on the intended commit:
 
@@ -205,7 +211,7 @@ git push origin v0.1.0
 Use a new tag for each release. After both builds pass, the workflow creates a
 GitHub release with `esp-serial2wifi-v0.1.0.tar.gz` (both capacities) and its
 SHA-256 file. The tag
-sets the firmware version; update the Makefile default when starting a new version.
+sets the firmware version. The Makefile default controls local builds only.
 Tags with a suffix, such as `v0.1.1-rc1`, produce prereleases. Failed builds do not
 publish. Versioned releases are not overwritten; the master prerelease is replaced
 after successful master builds. Stable releases remain marked as latest even

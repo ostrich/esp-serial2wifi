@@ -28,6 +28,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.12'
@@ -57,6 +58,10 @@ jobs:
               if not re.fullmatch(r'v\d+\.\d+\.\d+(?:-[A-Za-z0-9]+(?:[.-][A-Za-z0-9]+)*)?', version):
                   raise SystemExit('Release tags must look like v0.1.0 or v0.1.1-rc1')
           else:
+              tags = subprocess.check_output(['git', 'tag', '--merged', 'HEAD'], text=True).splitlines()
+              stable = [tag for tag in tags if re.fullmatch(r'v(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)', tag)]
+              if stable:
+                  base = max(stable, key=lambda tag: tuple(map(int, tag[1:].split('.'))))
               revision = subprocess.check_output(['git', 'rev-parse', '--short=8', 'HEAD'], text=True).strip()
               version = base + '-dev.' + revision
           stamp = subprocess.check_output(['git', 'show', '-s', '--format=%ct', 'HEAD'], text=True).strip()
