@@ -1,0 +1,9 @@
+{
+  "package": "@xterm/xterm",
+  "version": "5.5.0",
+  "source": "https://registry.npmjs.org/@xterm/xterm/-/xterm-5.5.0.tgz",
+  "archive_sha256": "bd954fa721872170188cc5d7e83e88db3c83c9a18a4e8d24c2783d26491f59d2",
+  "reason": "5.5.0 JS+CSS gzip 69316 bytes;6.0.0 requires122970 bytes and exceeds current application slot budget",
+  "license": "MIT",
+  "distribution": "Original lib/xterm.js with the complete MIT license prepended; original xterm.css. No runtime CDN or npm dependency."
+}

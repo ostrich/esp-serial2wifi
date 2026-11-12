@@ -1,0 +1,249 @@
+{
+  "/api/v1/capabilities": {
+    "schema": 1,
+    "features": {
+      "mqtt": true,
+      "syslog": true,
+      "custom_pages": true,
+      "rest": true,
+      "socket": true,
+      "ota": false,
+      "optiboot_upload": true,
+      "optiboot_readback": true
+    },
+    "limits": {
+      "console_buffer_bytes": 1024,
+      "max_ota_image_bytes": 0,
+      "flash_slot_bytes": 503808
+    },
+    "serial_tcp_ports": [
+      23,
+      2323
+    ]
+  },
+  "/api/v1/status": {
+    "schema": 1,
+    "hostname": "recovery-demo",
+    "description": "Standalone access to the attached serial device",
+    "firmware": {
+      "version": "esp-serial2wifi v0.1.0",
+      "sdk": "3.0.6-dev(072755c)",
+      "slot": "user1",
+      "image_abi": "ELSDK306-MAP4-CFG1",
+      "flash_bytes": 4194304,
+      "ota_eligible": false
+    },
+    "system": {
+      "uptime_ms": 1234567,
+      "heap_free_bytes": 20904,
+      "reset_reason": "external_reset",
+      "reset_code": 6
+    },
+    "wifi": {
+      "mode": "ap",
+      "state": "ready",
+      "reason": null,
+      "ssid": "Recovery demo",
+      "ip": "192.168.4.1",
+      "ap_ip": "192.168.4.1",
+      "mac": "02:00:00:00:00:01",
+      "rssi_dbm": null,
+      "channel": 1,
+      "ap_clients": 1
+    },
+    "serial": {
+      "state": "ready",
+      "listener_ready": true,
+      "clients": 0,
+      "baud": 115200,
+      "configured_format": "8N1",
+      "target_connected": null,
+      "rx_bytes": 0,
+      "loss_detected": false,
+      "boot_id": 42,
+      "errors": {
+        "uart_ring_bytes": 0,
+        "uart_frame_bytes": 0,
+        "uart_frames": 0,
+        "uart_overruns": 0,
+        "tcp_output_bytes": 0,
+        "tcp_rejections": 0,
+        "tcp_input_alloc": 0,
+        "tcp_output_alloc": 0,
+        "tcp_send": 0,
+        "tcp_hold": 0,
+        "web_output_bytes": 0
+      }
+    },
+    "mqtt": {
+      "enabled": false,
+      "state": "disabled"
+    }
+  },
+  "/api/v1/network": {
+    "schema": 1,
+    "operation": {
+      "id": 0,
+      "state": "idle",
+      "error": null
+    },
+    "mode": "ap",
+    "station": {
+      "ssid": "demo-router",
+      "password_configured": true,
+      "bssid": null
+    },
+    "ap": {
+      "ssid": "recovery-demo",
+      "password_configured": true,
+      "security": "wpa2",
+      "channel": 1,
+      "hidden": false,
+      "address": "192.168.4.1"
+    },
+    "ip": {
+      "dhcp": true,
+      "address": "0.0.0.0",
+      "mask": "0.0.0.0",
+      "gateway": "0.0.0.0",
+      "dns1": "0.0.0.0",
+      "dns2": "0.0.0.0"
+    },
+    "identity": {
+      "hostname": "recovery-demo",
+      "mdns": false,
+      "mdns_name": "esp-serial2wifi"
+    }
+  },
+  "/api/v1/serial": {
+    "schema": 1,
+    "baud": 115200,
+    "data_bits": 8,
+    "parity": "N",
+    "stop_bits": "1",
+    "clients": 0,
+    "ports": [
+      23,
+      2323
+    ],
+    "programming": false,
+    "queued_bytes": 0,
+    "cancelled_bytes": 0,
+    "reset_pin": 12,
+    "capture_bytes": 1023
+  },
+  "/api/v1/serial/capture": {
+    "schema": 1,
+    "boot": 42,
+    "epoch": 0,
+    "start": 0,
+    "end": 0,
+    "reason": null,
+    "lost": 0,
+    "encoding": "base64",
+    "data": ""
+  },
+  "/api/v1/settings": {
+    "schema": 1,
+    "sequence": 12,
+    "restart_required": false,
+    "pending_apply": false,
+    "identity": {
+      "hostname": "recovery-demo",
+      "description": "Recovery console"
+    },
+    "pins": {
+      "reset": 0,
+      "isp": -1,
+      "conn": 2,
+      "ser": -1,
+      "swap": false,
+      "rx_pullup": true
+    },
+    "services": {
+      "sntp_server": "",
+      "timezone_offset": 0,
+      "mdns_enable": true,
+      "mdns_name": "esp-serial2wifi",
+      "syslog": {
+        "host": "",
+        "min_heap": 8192,
+        "filter": 6,
+        "show_tick": true,
+        "show_date": false
+      }
+    }
+  },
+  "/api/v1/integrations": {
+    "schema": 1,
+    "sequence": 12,
+    "pending_apply": false,
+    "slip": {
+      "enabled": false
+    },
+    "mqtt": {
+      "enabled": false,
+      "host": "broker.local",
+      "port": 1883,
+      "client_id": "esp-serial2wifi",
+      "username": "",
+      "password_configured": true,
+      "clean_session": true,
+      "timeout": 5,
+      "keepalive": 30,
+      "reporting": {
+        "enabled": false,
+        "topic": "esp/status",
+        "interval_seconds": 60,
+        "last_successful_publish_ms": null,
+        "sample": {
+          "rssi": 0,
+          "heap_free": 12000
+        }
+      }
+    }
+  },
+  "/api/v1/diagnostics/log": {
+    "schema": 1,
+    "boot": 42,
+    "epoch": 0,
+    "start": 0,
+    "end": 15,
+    "reason": null,
+    "lost": 0,
+    "encoding": "base64",
+    "data": "RGV2aWNlIHJlYWR5Lg0K"
+  },
+  "/api/v1/firmware": {
+    "schema": 1,
+    "version": "esp-serial2wifi v0.1.0",
+    "sdk": "3.0.6",
+    "image_abi": "ELSDK306-MAP4-CFG1",
+    "flash_bytes": 4194304,
+    "active_slot": 1,
+    "target_slot": 2,
+    "max_image_bytes": 503808,
+    "ota_supported": false,
+    "reason": "Wi-Fi updates are disabled in this firmware",
+    "cross_sdk_ota": false,
+    "automatic_rollback": false
+  },
+  "/api/v1/pages": {
+    "schema": 1,
+    "supported": true,
+    "capacity_bytes": 3129344,
+    "html_prefix_bytes": 320,
+    "valid": true,
+    "used_bytes": 16,
+    "count": 0,
+    "truncated": false,
+    "index": 0,
+    "next": null,
+    "files": []
+  },
+  "/api/v1/diagnostics/uart-log": {
+    "schema": 1,
+    "mode": "off",
+    "uart_enabled": false
+  }
+}

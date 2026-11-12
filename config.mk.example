@@ -1,0 +1,9 @@
+# Copy to config.mk for local overrides; config.mk is ignored by Git.
+FLASH_SIZE = 4MB
+# PORT = /dev/ttyUSB0
+# SERIAL_SLOT = 1
+# MCU_RESET_PIN = 12
+# MCU_ISP_PIN = 13
+# LED_CONN_PIN = 0
+# LED_SERIAL_PIN = 14
+# SERIAL2WIFI_DEBUG = 1

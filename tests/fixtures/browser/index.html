@@ -1,0 +1,53 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>SDK fixture browser smoke test</title>
+<pre id="result">Running fixture checks…</pre>
+<script>
+(async () => {
+  const results = [];
+  const check = (condition, label) => {
+    if (!condition) throw new Error(label);
+    results.push(label);
+  };
+  const scenario = async (mode, delay = 0) => {
+    const response = await fetch('/__test/scenario', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({route: '/api/v1/firmware', mode, delay})
+    });
+    if (!response.ok) throw new Error('scenario control failed');
+  };
+  try {
+    await scenario('normal');
+    let response = await fetch('/api/v1/firmware');
+    check(response.ok && typeof (await response.json()).sdk === 'string', 'normal JSON');
+    await scenario('http-error');
+    response = await fetch('/api/v1/firmware');
+    check(response.status === 503, 'HTTP error visible');
+    await scenario('malformed');
+    let rejected = false;
+    try { await (await fetch('/api/v1/firmware')).json(); } catch (_) { rejected = true; }
+    check(rejected, 'malformed JSON rejected');
+    await scenario('delayed', .2);
+    response = await fetch('/api/v1/firmware');
+    check(response.ok && typeof (await response.json()).sdk === 'string', 'delayed JSON');
+    rejected = false;
+    try { await fetch('/api/v1/firmware', {signal: AbortSignal.abort()}); }
+    catch (error) { rejected = error.name === 'AbortError'; }
+    check(rejected, 'cancelled request rejected');
+    await scenario('disconnect');
+    rejected = false;
+    try { await fetch('/api/v1/firmware'); } catch (_) { rejected = true; }
+    check(rejected, 'disconnect rejected');
+    await scenario('normal');
+    response = await fetch('/api/v1/firmware');
+    check(response.ok && typeof (await response.json()).sdk === 'string', 'normal recovery');
+    response = await fetch('/wifi/connect', {method: 'POST'});
+    check(response.status === 405, 'device mutation refused');
+    document.body.dataset.result = 'pass';
+  } catch (error) {
+    results.push(String(error));
+    document.body.dataset.result = 'fail';
+  }
+  document.querySelector('#result').textContent = JSON.stringify(results);
+})();
+</script>

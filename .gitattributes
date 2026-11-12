@@ -1,0 +1,6 @@
+* text=auto eol=lf
+*.ico -text
+*.bin -text
+# Preserve upstream license/vendor bytes without whitespace normalization.
+LICENSE -text whitespace=-blank-at-eof
+third_party/** -text whitespace=-blank-at-eof,-blank-at-eol,-space-before-tab

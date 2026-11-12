@@ -1,0 +1,4 @@
+# Build-time gzip encoder; the device/browser use ordinary gzip.
+zopfli==0.4.3
+
+-r requirements-flash.txt

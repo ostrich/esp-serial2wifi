@@ -1,0 +1,11 @@
+.venv/
+.cache/
+node_modules/
+/build/
+/firmware/
+/dist/
+/backups/
+/.build-tests/
+/config.mk
+__pycache__/
+*.pyc

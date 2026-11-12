@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {checkFirmware,checkPages,bootOutcome} from '../web/app/update-model.js';
+const info={target_slot:2,max_image_bytes:503808,image_abi:'ELSDK306-MAP4-CFG1'},data=new Uint8Array(1028),v=new DataView(data.buffer);
+data.set([0xea,4,0,1]);v.setUint32(4,0x40100000,true);v.setUint32(12,16,true);data.set(new TextEncoder().encode(info.image_abi),32);
+assert.equal(checkFirmware(data,info).target,2);data[3]=0;assert.throws(()=>checkFirmware(data,info));data[3]=1;data.fill(0,32);assert.throws(()=>checkFirmware(data,info));
+const pages={capacity_bytes:4096,html_prefix_bytes:320};assert.equal(checkPages([{name:'a.html',size:5}],pages).bytes,368);
+assert.throws(()=>checkPages([{name:'../a',size:1}],pages));assert.throws(()=>checkPages([{name:'a',size:1},{name:'a',size:1}],pages));assert.throws(()=>checkPages([{name:'big',size:5000}],pages));
+const status={firmware:{slot:'user2',version:'esp-serial2wifi expected'}};
+assert.equal(bootOutcome(status,1,2,'esp-serial2wifi expected').state,'verified');assert.equal(bootOutcome(status,1,2,'').state,'unverified');assert.equal(bootOutcome(status,1,2,'wrong').state,'mismatch');assert.equal(bootOutcome(status,2,1,'').state,'waiting');
+for(const [slot,before,target] of [['user1',2,1],['user2',1,2]])assert.equal(bootOutcome({firmware:{slot,version:'expected'}},before,target,'expected').state,'verified');
+assert.equal(bootOutcome({firmware:{slot:'unknown',version:'expected'}},1,2,'expected').state,'waiting');
+console.log('PASS update model: image slot/ABI bounds, page capacity/names, explicit boot identity outcomes');

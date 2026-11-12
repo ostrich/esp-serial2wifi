@@ -1,0 +1,26 @@
+{
+  "/menu": {
+    "menu": [
+      "Home",
+      "/home.html",
+      "WiFi Station",
+      "/wifi/wifiSta.html",
+      "WiFi Soft-AP",
+      "/wifi/wifiAp.html",
+      "&#xb5;C Console",
+      "/console.html",
+      "Services",
+      "/services.html",
+      "REST/MQTT",
+      "/mqtt.html",
+      "Debug log",
+      "/log.html",
+      "Upgrade Firmware",
+      "/flash.html",
+      "Web Server",
+      "/web-server.html"
+    ],
+    "version": "esp-serial2wifi v0.1.0",
+    "name": "recovery-demo"
+  }
+}

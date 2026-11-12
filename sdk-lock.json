@@ -1,0 +1,20 @@
+{
+  "sdk": {
+    "version": "3.0.6",
+    "commit": "8e1386548cdca53f24e4758b5fc8494791ee060b",
+    "url": "https://codeload.github.com/espressif/ESP8266_NONOS_SDK/tar.gz/8e1386548cdca53f24e4758b5fc8494791ee060b",
+    "archive": "ESP8266_NONOS_SDK-3.0.6.tar.gz",
+    "sha256": "fa6e691724822c0aaf61f25f6a6b4ea568497f32e1a304660e3144248a0b4aca",
+    "directory": "ESP8266_NONOS_SDK-3.0.6",
+    "strip_components": 1,
+    "runtime_version": "3.0.6-dev(072755c)"
+  },
+  "toolchain": {
+    "version": "crosstool-NG 1.20.0 / GCC 4.8.2",
+    "url": "https://s3.amazonaws.com/s3.voneicken.com/xtensa-lx106-elf-20160330.tgx",
+    "archive": "xtensa-lx106-elf-20160330.tgx",
+    "sha256": "60ac1c6ca57fbdcdc6b800a6dff4e7ca0c037cc6b8a20666037eefe555afc8db",
+    "directory": "xtensa-lx106-elf",
+    "strip_components": 1
+  }
+}

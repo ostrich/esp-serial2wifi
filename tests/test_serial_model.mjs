@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import {CaptureLog,CommandHistory,commandBody,decodeCapture,validateUART,terminalReplay} from '../web/app/serial-model.js';
+const capture=(data,start=0,extra={})=>({schema:1,boot:42,epoch:0,start,end:(start+data.length)>>>0,reason:null,lost:0,encoding:'base64',data:Buffer.from(data).toString('base64'),...extra});
+const log=new CaptureLog();log.ingest(capture([0x41,0xc3]));log.ingest(capture([0xa9,13],2));log.ingest(capture([10,0,0xff,0x3c],4));
+assert.equal(log.text,'Aé\n[0x00]�<');assert.equal(log.path,'/api/v1/serial/capture/42/0/8');
+log.clear();assert.equal(log.text,'');assert.equal(log.path,'/api/v1/serial/capture/42/0/8');
+log.ingest(capture([66],10,{reason:'gap',lost:2}));assert(log.text.includes('2 bytes no longer available'));assert(log.text.endsWith('B'));
+log.ingest(capture([67],0,{epoch:1,reason:'cleared',lost:null}));assert(log.text.includes('Device capture was cleared'));
+log.ingest(capture([68],0,{boot:43,reason:'restart',lost:null}));assert(log.text.includes('ESP Serial2WiFi restarted'));
+const wrap=new CaptureLog();wrap.ingest(capture([65],0xffffffff));wrap.ingest(capture([66],0));assert.equal(wrap.text,'AB');
+assert.throws(()=>decodeCapture(capture([1],0,{end:2})));assert.throws(()=>decodeCapture(capture([1],0,{data:'!!!!'})));
+const bounded=new CaptureLog({maxBytes:20,maxLines:2});for(let i=0;i<10000;i++)bounded.append('雪\n');assert(bounded.bytes<=20&&bounded.lineCount<=2&&bounded.trimmedBytes>0);bounded.append('tail');assert(bounded.lineCount<=2);
+assert.equal(commandBody('é','crlf').get('hex'),'c3a90d0a');assert.throws(()=>commandBody('x'.repeat(256),'lf'));assert.throws(()=>commandBody('','none'));
+const history=new CommandHistory();history.sent('a');history.sent('b');assert.equal(history.move(-1,'draft'),'b');assert.equal(history.move(-1,''),'a');assert.equal(history.move(1,''),'b');assert.equal(history.move(1,''),'draft');
+for(let i=0;i<200;i++)history.sent('command'+i);assert.equal(history.items.length,100);
+assert.deepEqual(validateUART({baud:'115200',data_bits:'8',parity:'O',stop_bits:'2'}),{});assert(validateUART({baud:'9600oops',data_bits:'8',parity:'N',stop_bits:'1'}).baud);
+console.log('PASS serial models: exact binary/u32 cursors, split UTF-8/CRLF, visible gaps/reset/clear, byte/line bounds, command encoding/history and UART validation');
+
+assert.equal(commandBody('00 FF 1b','none','hex').get('hex'),'00ff1b');
+assert.equal(commandBody('00','crlf','hex').get('hex'),'000d0a');
+for(const invalid of ['0','0xFF','gg'])assert.throws(()=>commandBody(invalid,'none','hex'));
+const binary=new CaptureLog({maxBytes:16,maxLines:3});binary.ingest(capture([0,255,27,91,54,110]));assert.equal(binary.hex,'00 ff 1b 5b 36 6e\n');
+for(let i=0;i<20;i++)binary.ingest(capture([i],i+6));assert(binary.hexBytes<=16&&binary.hexLines<=3&&binary.hexTrimmedBytes>0);binary.clear();assert.equal(binary.hex,'');
+console.log('PASS raw hex: exact send/receive bytes, suffix validation and bounded history');
+
+const recent=capture(Buffer.from('cut line\n\x1b[31mready\x1b[0m'),100);
+assert.equal(new TextDecoder().decode(terminalReplay(recent,null).bytes),'\x1b[31mready\x1b[0m');
+const partial=capture([0xa9,65,66],100);assert.deepEqual([...terminalReplay(partial,null).bytes],[65,66]);
+assert.deepEqual([...terminalReplay(partial,{boot:42,epoch:0,end:100}).bytes],[0xa9,65,66]);
+assert.equal(terminalReplay(partial,{boot:42,epoch:0,end:103}).bytes.length,0);
+assert(terminalReplay(partial,{boot:42,epoch:0,end:1}).gap);
+assert(terminalReplay(partial,{boot:43,epoch:0,end:103}).reset);
+assert.deepEqual([...terminalReplay(capture([65,66],0xffffffff),{boot:42,epoch:0,end:0}).bytes],[66]);
+console.log('PASS terminal history: truncation, UTF-8 boundaries, unread-only resume, restart, gaps and u32 wrap');
+
+const {reportedAddress}=await import('../web/app/status.js');
+assert.equal(reportedAddress({mode:'ap',ip:'192.168.4.1',ap_ip:'192.168.4.1'},'localhost'),'192.168.4.1');
+assert.equal(reportedAddress({mode:'station_ap',ip:'10.1.2.3',ap_ip:'192.168.4.1'},'192.168.4.1'),'192.168.4.1');
+assert.equal(reportedAddress({mode:'station_ap',ip:'10.1.2.3',ap_ip:'192.168.4.1'},'localhost'),'10.1.2.3');
+assert.equal(reportedAddress({mode:'station_ap',ip:'0.0.0.0',ap_ip:'192.168.4.1'}),'192.168.4.1');
+assert.equal(reportedAddress({mode:'ap',ap_ip:'192.168.004.001'}),'192.168.4.1');
+for(const ip of [null,'0.0.0.0','999.1.2.3','192.168.4.1; echo unsafe','$(echo unsafe)'])assert.equal(reportedAddress({mode:'ap',ip},'localhost'),null);
+console.log('PASS device-address examples: forwarded browser host, both interfaces, missing/malformed IPs and canonical command arguments');
