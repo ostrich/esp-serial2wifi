@@ -14,20 +14,19 @@ Header, filename and file data is 32-bit aligned. The last file is indicated by 
 with the FLAG_LASTFILE flag set.
 */
 
-
-#define FLAG_LASTFILE (1<<0)
-#define FLAG_GZIP (1<<1)
+#define FLAG_LASTFILE (1 << 0)
+#define FLAG_GZIP (1 << 1)
 #define COMPRESS_NONE 0
 #define COMPRESS_HEATSHRINK 1
 #define ESPFS_MAGIC 0x73665345
 
 typedef struct {
-	int32_t magic;
-	int8_t flags;
-	int8_t compression;
-	int16_t nameLen;
-	int32_t fileLenComp;
-	int32_t fileLenDecomp;
+  int32_t magic;
+  int8_t flags;
+  int8_t compression;
+  int16_t nameLen;
+  int32_t fileLenComp;
+  int32_t fileLenDecomp;
 } __attribute__((packed)) EspFsHeader;
 
 #endif

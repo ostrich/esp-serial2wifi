@@ -25,9 +25,14 @@
 #include "config.h"
 
 #ifdef CMD_DBG
-#define DBG(format, ...) do { os_printf(format, ## __VA_ARGS__); } while(0)
+#define DBG(format, ...)                                                                           \
+  do {                                                                                             \
+    os_printf(format, ##__VA_ARGS__);                                                              \
+  } while (0)
 #else
-#define DBG(format, ...) do { } while(0)
+#define DBG(format, ...)                                                                           \
+  do {                                                                                             \
+  } while (0)
 #endif
 
 static void cmdNull(CmdPacket *cmd);
@@ -56,43 +61,42 @@ bool cmdInSync = false;
 
 // Command dispatch table for serial -> ESP commands
 const CmdList commands[] = {
-  {CMD_NULL,            "NULL",           cmdNull},        // no-op
-  {CMD_SYNC,            "SYNC",           cmdSync},        // synchronize
-  {CMD_WIFI_STATUS,     "WIFI_STATUS",    cmdWifiStatus},
-  {CMD_CB_ADD,          "ADD_CB",         cmdAddCallback},
-  {CMD_GET_TIME,        "GET_TIME",       cmdGetTime},
-  {CMD_GET_WIFI_INFO,   "GET_WIFI_INFO",  cmdGetWifiInfo},
-  // {CMD_SET_WIFI_INFO,   "SET_WIFI_INFO",  cmdSetWifiInfo},
+    {CMD_NULL, "NULL", cmdNull}, // no-op
+    {CMD_SYNC, "SYNC", cmdSync}, // synchronize
+    {CMD_WIFI_STATUS, "WIFI_STATUS", cmdWifiStatus},
+    {CMD_CB_ADD, "ADD_CB", cmdAddCallback},
+    {CMD_GET_TIME, "GET_TIME", cmdGetTime},
+    {CMD_GET_WIFI_INFO, "GET_WIFI_INFO", cmdGetWifiInfo},
+    // {CMD_SET_WIFI_INFO,   "SET_WIFI_INFO",  cmdSetWifiInfo},
 
-  {CMD_WIFI_GET_APCOUNT,	"WIFI_GET_APCOUNT",	cmdWifiGetApCount},
-  {CMD_WIFI_GET_APNAME,		"WIFI_GET_APNAME",	cmdWifiGetApName},
-  {CMD_WIFI_SELECT_SSID,	"WIFI_SELECT_SSID",	cmdWifiSelectSSID},
-  {CMD_WIFI_SIGNAL_STRENGTH,	"WIFI_SIGNAL_STRENGTH",	cmdWifiSignalStrength},
-  {CMD_WIFI_GET_SSID,		"WIFI_GET_SSID",	cmdWifiQuerySSID},
-  {CMD_WIFI_START_SCAN,		"WIFI_START_SCAN",	cmdWifiStartScan},
+    {CMD_WIFI_GET_APCOUNT, "WIFI_GET_APCOUNT", cmdWifiGetApCount},
+    {CMD_WIFI_GET_APNAME, "WIFI_GET_APNAME", cmdWifiGetApName},
+    {CMD_WIFI_SELECT_SSID, "WIFI_SELECT_SSID", cmdWifiSelectSSID},
+    {CMD_WIFI_SIGNAL_STRENGTH, "WIFI_SIGNAL_STRENGTH", cmdWifiSignalStrength},
+    {CMD_WIFI_GET_SSID, "WIFI_GET_SSID", cmdWifiQuerySSID},
+    {CMD_WIFI_START_SCAN, "WIFI_START_SCAN", cmdWifiStartScan},
 
 #ifdef MQTT
-  {CMD_MQTT_SETUP,      "MQTT_SETUP",     MQTTCMD_Setup},
-  {CMD_MQTT_PUBLISH,    "MQTT_PUB",       MQTTCMD_Publish},
-  {CMD_MQTT_SUBSCRIBE , "MQTT_SUB",       MQTTCMD_Subscribe},
-  {CMD_MQTT_LWT,        "MQTT_LWT",       MQTTCMD_Lwt},
-  {CMD_MQTT_GET_CLIENTID,"MQTT_CLIENTID", cmdMqttGetClientId},
+    {CMD_MQTT_SETUP, "MQTT_SETUP", MQTTCMD_Setup},
+    {CMD_MQTT_PUBLISH, "MQTT_PUB", MQTTCMD_Publish},
+    {CMD_MQTT_SUBSCRIBE, "MQTT_SUB", MQTTCMD_Subscribe},
+    {CMD_MQTT_LWT, "MQTT_LWT", MQTTCMD_Lwt},
+    {CMD_MQTT_GET_CLIENTID, "MQTT_CLIENTID", cmdMqttGetClientId},
 #endif
 #ifdef REST
-  {CMD_REST_SETUP,      "REST_SETUP",     REST_Setup},
-  {CMD_REST_REQUEST,    "REST_REQ",       REST_Request},
-  {CMD_REST_SETHEADER,  "REST_SETHDR",    REST_SetHeader},
+    {CMD_REST_SETUP, "REST_SETUP", REST_Setup},
+    {CMD_REST_REQUEST, "REST_REQ", REST_Request},
+    {CMD_REST_SETHEADER, "REST_SETHDR", REST_SetHeader},
 #endif
 #ifdef WEBSERVER
-  {CMD_WEB_SETUP,       "WEB_SETUP",      WEB_Setup},
-  {CMD_WEB_DATA,        "WEB_DATA",       WEB_Data},
+    {CMD_WEB_SETUP, "WEB_SETUP", WEB_Setup},
+    {CMD_WEB_DATA, "WEB_DATA", WEB_Data},
 #endif
 #ifdef SOCKET
-  {CMD_SOCKET_SETUP,    "SOCKET_SETUP",   SOCKET_Setup},
-  {CMD_SOCKET_SEND,     "SOCKET_SEND",    SOCKET_Send},
+    {CMD_SOCKET_SETUP, "SOCKET_SETUP", SOCKET_Setup},
+    {CMD_SOCKET_SEND, "SOCKET_SEND", SOCKET_Send},
 #endif
-  {CMD_NULL, NULL, NULL}
-};
+    {CMD_NULL, NULL, NULL}};
 
 //===== List of registered callbacks (to uC)
 
@@ -100,15 +104,14 @@ const CmdList commands[] = {
 #define MAX_CALLBACKS 12
 CmdCallback callbacks[MAX_CALLBACKS]; // cleared in cmdSync
 
-uint32_t ICACHE_FLASH_ATTR
-cmdAddCb(char* name, uint32_t cb) {
+uint32_t ICACHE_FLASH_ATTR cmdAddCb(char *name, uint32_t cb) {
   for (uint8_t i = 0; i < MAX_CALLBACKS; i++) {
     //DBG("cmdAddCb: index %d name=%s cb=%p\n", i, callbacks[i].name,
     //  (void *)callbacks[i].callback);
     // find existing callback or add to the end
     if (os_strncmp(callbacks[i].name, name, CMD_CBNLEN) == 0 || callbacks[i].name[0] == '\0') {
       os_strncpy(callbacks[i].name, name, sizeof(callbacks[i].name));
-      callbacks[i].name[CMD_CBNLEN-1] = 0; // strncpy doesn't null terminate
+      callbacks[i].name[CMD_CBNLEN - 1] = 0; // strncpy doesn't null terminate
       callbacks[i].callback = cb;
       DBG("cmdAddCb: '%s'->0x%x added at %d\n", callbacks[i].name, cb, i);
       return 1;
@@ -117,8 +120,7 @@ cmdAddCb(char* name, uint32_t cb) {
   return 0;
 }
 
-CmdCallback* ICACHE_FLASH_ATTR
-cmdGetCbByName(char* name) {
+CmdCallback *ICACHE_FLASH_ATTR cmdGetCbByName(char *name) {
   for (uint8_t i = 0; i < MAX_CALLBACKS; i++) {
     //DBG("cmdGetCbByName: index %d name=%s cb=%p\n", i, callbacks[i].name,
     //  (void *)callbacks[i].callback);
@@ -135,16 +137,15 @@ cmdGetCbByName(char* name) {
 //===== Wifi callback
 
 // Callback from wifi subsystem to notify us of status changes
-static void ICACHE_FLASH_ATTR
-cmdWifiCb(uint8_t wifiStatus) {
-  if (wifiStatus != lastWifiStatus){
+static void ICACHE_FLASH_ATTR cmdWifiCb(uint8_t wifiStatus) {
+  if (wifiStatus != lastWifiStatus) {
     DBG("cmdWifiCb: wifiStatus=%d\n", wifiStatus);
     lastWifiStatus = wifiStatus;
     CmdCallback *wifiCb = cmdGetCbByName("wifiCb");
     if ((uint32_t)wifiCb->callback != -1) {
       uint8_t status = wifiStatus == wifiGotIP ? 5 : 1;
       cmdResponseStart(CMD_RESP_CB, (uint32_t)wifiCb->callback, 1);
-      cmdResponseBody((uint8_t*)&status, 1);
+      cmdResponseBody((uint8_t *)&status, 1);
       cmdResponseEnd();
     }
   }
@@ -153,17 +154,14 @@ cmdWifiCb(uint8_t wifiStatus) {
 //===== Command handlers
 
 // Command handler for Null command
-static void ICACHE_FLASH_ATTR
-cmdNull(CmdPacket *cmd) {
-}
+static void ICACHE_FLASH_ATTR cmdNull(CmdPacket *cmd) {}
 
 // Command handler for sync command
-static void ICACHE_FLASH_ATTR
-cmdSync(CmdPacket *cmd) {
+static void ICACHE_FLASH_ATTR cmdSync(CmdPacket *cmd) {
   CmdRequest req;
   uart0_write_char(SLIP_END); // prefix with a SLIP END to ensure we get a clean start
   cmdRequest(&req, cmd);
-  if(cmd->argc != 0 || cmd->value == 0) {
+  if (cmd->argc != 0 || cmd->value == 0) {
     cmdResponseStart(CMD_RESP_V, 0, 0);
     cmdResponseEnd();
     return;
@@ -194,28 +192,25 @@ cmdSync(CmdPacket *cmd) {
 }
 
 // Command handler for wifi status command
-static void ICACHE_FLASH_ATTR
-cmdWifiStatus(CmdPacket *cmd) {
+static void ICACHE_FLASH_ATTR cmdWifiStatus(CmdPacket *cmd) {
   cmdResponseStart(CMD_RESP_V, wifiState, 0);
   cmdResponseEnd();
   return;
 }
 
 // Command handler for time
-static void ICACHE_FLASH_ATTR
-cmdGetTime(CmdPacket *cmd) {
+static void ICACHE_FLASH_ATTR cmdGetTime(CmdPacket *cmd) {
   cmdResponseStart(CMD_RESP_V, sntp_get_current_timestamp(), 0);
   cmdResponseEnd();
   return;
 }
 
 // Command handler for IP information
-static void ICACHE_FLASH_ATTR
-cmdGetWifiInfo(CmdPacket *cmd) {
+static void ICACHE_FLASH_ATTR cmdGetWifiInfo(CmdPacket *cmd) {
   CmdRequest req;
 
   cmdRequest(&req, cmd);
-  if(cmd->argc != 0 || cmd->value == 0) {
+  if (cmd->argc != 0 || cmd->value == 0) {
     cmdResponseStart(CMD_RESP_V, 0, 0);
     cmdResponseEnd();
     return;
@@ -237,19 +232,21 @@ cmdGetWifiInfo(CmdPacket *cmd) {
 }
 
 // Command handler to add a callback to the named-callbacks list, this is for a callback to the uC
-static void ICACHE_FLASH_ATTR
-cmdAddCallback(CmdPacket *cmd) {
+static void ICACHE_FLASH_ATTR cmdAddCallback(CmdPacket *cmd) {
   CmdRequest req;
   cmdRequest(&req, cmd);
-  if (cmd->argc != 1 || cmd->value == 0) return;
+  if (cmd->argc != 1 || cmd->value == 0)
+    return;
 
   char name[16];
   uint16_t len;
 
   // get the callback name
   len = cmdArgLen(&req);
-  if (len > 15) return; // max size of name is 15 characters
-  if (cmdPopArg(&req, (uint8_t *)name, len)) return;
+  if (len > 15)
+    return; // max size of name is 15 characters
+  if (cmdPopArg(&req, (uint8_t *)name, len))
+    return;
   name[len] = 0;
   DBG("cmdAddCallback: name=%s\n", name);
 
@@ -276,7 +273,7 @@ static void ICACHE_FLASH_ATTR cmdWifiGetApName(CmdPacket *cmd) {
     return;
 
   uint16_t i;
-  cmdPopArg(&req, (uint8_t*)&i, 2);
+  cmdPopArg(&req, (uint8_t *)&i, 2);
 
   uint32_t callback = req.cmd->value;
 
@@ -286,7 +283,7 @@ static void ICACHE_FLASH_ATTR cmdWifiGetApName(CmdPacket *cmd) {
   DBG("wifiGetApName(%d) -> {%s}\n", i, myssid);
 
   cmdResponseStart(CMD_RESP_CB, callback, 1);
-  cmdResponseBody(myssid, strlen(myssid)+1);
+  cmdResponseBody(myssid, strlen(myssid) + 1);
   cmdResponseEnd();
 }
 
@@ -302,7 +299,8 @@ static void ICACHE_FLASH_ATTR cmdWifiSelectSSID(CmdPacket *cmd) {
   int argc = cmdGetArgc(&req);
   char ssid[33], pass[65];
 
-  if (argc != 2) return;
+  if (argc != 2)
+    return;
 
   int len = cmdArgLen(&req);
   if (len == 1) {
@@ -313,14 +311,16 @@ static void ICACHE_FLASH_ATTR cmdWifiSelectSSID(CmdPacket *cmd) {
     ssid[32] = '\0';
   } else {
     // Longer than 1 byte: must be SSID
-    if (len > 32) return;
+    if (len > 32)
+      return;
     cmdPopArg(&req, ssid, len);
     ssid[len] = 0;
   }
 
   // Extract password from message
   len = cmdArgLen(&req);
-  if (len > 64) return;
+  if (len > 64)
+    return;
   cmdPopArg(&req, pass, len);
   pass[len] = 0;
 
@@ -350,7 +350,7 @@ static void ICACHE_FLASH_ATTR cmdWifiSignalStrength(CmdPacket *cmd) {
   }
 
   char x;
-  cmdPopArg(&req, (uint8_t*)&x, 1);
+  cmdPopArg(&req, (uint8_t *)&x, 1);
   int i = x;
   DBG("cmdWifiSignalStrength: argc %d, ", argc);
   DBG("i %d\n", i);
@@ -370,14 +370,14 @@ static void ICACHE_FLASH_ATTR cmdWifiQuerySSID(CmdPacket *cmd) {
   struct station_config conf;
   bool res = wifi_station_get_config(&conf);
   if (res) {
-  // #warning handle me
+    // #warning handle me
   } else {
   }
 
   DBG("QuerySSID : %s\n", conf.ssid);
 
   cmdResponseStart(CMD_RESP_CB, callback, 1);
-  cmdResponseBody(conf.ssid, strlen((char *)conf.ssid)+1);
+  cmdResponseBody(conf.ssid, strlen((char *)conf.ssid) + 1);
   cmdResponseEnd();
 }
 
@@ -392,7 +392,7 @@ void ICACHE_FLASH_ATTR cmdMqttGetClientId(CmdPacket *cmd) {
   CmdRequest req;
 
   cmdRequest(&req, cmd);
-  if(cmd->argc != 0 || cmd->value == 0) {
+  if (cmd->argc != 0 || cmd->value == 0) {
     cmdResponseStart(CMD_RESP_V, 0, 0);
     cmdResponseEnd();
     return;
@@ -401,7 +401,7 @@ void ICACHE_FLASH_ATTR cmdMqttGetClientId(CmdPacket *cmd) {
   uint32_t callback = req.cmd->value;
 
   cmdResponseStart(CMD_RESP_CB, callback, 1);
-  cmdResponseBody(flashConfig.mqtt_clientid, strlen(flashConfig.mqtt_clientid)+1);
+  cmdResponseBody(flashConfig.mqtt_clientid, strlen(flashConfig.mqtt_clientid) + 1);
   cmdResponseEnd();
 
   os_printf("MqttGetClientId : %s\n", flashConfig.mqtt_clientid);

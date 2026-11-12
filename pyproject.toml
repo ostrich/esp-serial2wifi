@@ -1,0 +1,10 @@
+[tool.ruff]
+required-version = "==0.17.4"
+line-length = 100
+target-version = "py312"
+extend-exclude = ["third_party", ".cache", ".venv", "node_modules", "build", "firmware", "dist", ".build-tests", "backups"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = false

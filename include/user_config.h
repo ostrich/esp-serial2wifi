@@ -42,7 +42,7 @@
 
 // CHIP_IN_HOSTNAME is selected by the build configuration.
 
-extern char* firmwareVersion;
-extern uint8_t UTILS_StrToIP(const char* str, void *ip);
+extern char *firmwareVersion;
+extern uint8_t UTILS_StrToIP(const char *str, void *ip);
 
 #endif

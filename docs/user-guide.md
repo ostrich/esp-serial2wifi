@@ -187,14 +187,14 @@ to update the ESP itself.
 
 ## Troubleshooting
 
-| Symptom | What to check |
-| --- | --- |
-| Garbled serial output | Match baud, data bits, parity and stop bits; check crossed TX/RX, ground and signal levels. |
-| Blank terminal | The device may be quiet. Check wiring/settings; send input only if appropriate for that device. |
-| “Serial port in use elsewhere” | Check other browser windows and TCP clients. Pause or close the other session. |
-| Missing output | Diagnostics separates UART, TCP and web-terminal losses. Compare counters to see whether losses are new. |
-| Cannot connect after a change | Check the selected Wi-Fi network and new address; use the recovery AP after a failed router connection. |
-| Update reply lost | Reconnect and check version/slot before repeating an upload or activation. |
+| Symptom                        | What to check                                                                                            |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| Garbled serial output          | Match baud, data bits, parity and stop bits; check crossed TX/RX, ground and signal levels.              |
+| Blank terminal                 | The device may be quiet. Check wiring/settings; send input only if appropriate for that device.          |
+| “Serial port in use elsewhere” | Check other browser windows and TCP clients. Pause or close the other session.                           |
+| Missing output                 | Diagnostics separates UART, TCP and web-terminal losses. Compare counters to see whether losses are new. |
+| Cannot connect after a change  | Check the selected Wi-Fi network and new address; use the recovery AP after a failed router connection.  |
+| Update reply lost              | Reconnect and check version/slot before repeating an upload or activation.                               |
 
 Diagnostics counters reset when the ESP restarts. Recorded errors alone do not
 mean data is still being lost. A failed browser reconnect likewise does not prove

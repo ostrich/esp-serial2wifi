@@ -4,6 +4,7 @@
   "type": "module",
   "devDependencies": {
     "esbuild": "0.25.12",
+    "prettier": "3.9.6",
     "terser": "5.44.1"
   },
   "engines": {

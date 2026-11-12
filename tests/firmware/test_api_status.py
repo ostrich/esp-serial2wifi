@@ -1,26 +1,35 @@
 #!/usr/bin/env python3
 """Compile real JSON/status handlers with deterministic SDK observations."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
 import json
 import os
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[2]
-BUILD = ROOT / '.build-tests/api'
+BUILD = ROOT / ".build-tests/api"
 BUILD.mkdir(parents=True, exist_ok=True)
 
-http = (ROOT / 'src/httpd/httpd.c').read_text()
-http_headers = http[http.index('void ICACHE_FLASH_ATTR httpdStartResponse('):
-                    http.index('//ToDo: sprintf->snprintf')]
-cgi = (ROOT / 'src/core/cgi.c').read_text()
-cache_headers = cgi[cgi.index('void ICACHE_FLASH_ATTR noCacheHeaders('):
-                    cgi.index('void ICACHE_FLASH_ATTR jsonHeader(')]
-mqtt = (ROOT / 'src/mqtt/mqtt.c').read_text()
-connack = mqtt[mqtt.index('    case MQTT_MSG_TYPE_CONNACK:'):
-              mqtt.index('    case MQTT_MSG_TYPE_SUBACK:')]
+http = SourceText((ROOT / "src/httpd/httpd.c").read_text())
+http_headers = http[
+    http.index("void ICACHE_FLASH_ATTR httpdStartResponse(") : http.index(
+        "//ToDo: sprintf->snprintf"
+    )
+]
+cgi = SourceText((ROOT / "src/core/cgi.c").read_text())
+cache_headers = cgi[
+    cgi.index("void ICACHE_FLASH_ATTR noCacheHeaders(") : cgi.index(
+        "void ICACHE_FLASH_ATTR jsonHeader("
+    )
+]
+mqtt = SourceText((ROOT / "src/mqtt/mqtt.c").read_text())
+connack = mqtt[
+    mqtt.index("    case MQTT_MSG_TYPE_CONNACK:") : mqtt.index("    case MQTT_MSG_TYPE_SUBACK:")
+]
 
-prefix = r'''
+prefix = r"""
 #include <assert.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -82,9 +91,9 @@ static uint32_t webLost;
 uint32_t consoleBootId(void){return 42;}
 uint32_t consoleStreamTotalLost(void){return webLost;}
 bool firmwareOTASupported(void){return ota;}
-'''
+"""
 
-suffix = r'''
+suffix = r"""
 static struct espconn socket;
 static struct HttpdPriv priv;
 static HttpdConnData connection={.conn=&socket,.requestType=HTTPD_METHOD_GET,.priv=&priv};
@@ -153,68 +162,117 @@ int main(void){
  assert(clock.seconds==9001&&clock.micros==101);
  return 0;
 }
-'''
+"""
 
 for enabled in (False, True):
-    path = BUILD / ('full.c' if enabled else 'minimal.c')
-    observer = '#ifdef MQTT\nstatic void observeConnack(MQTT_Client *client,uint16_t msg_len){switch(MQTT_MSG_TYPE_CONNACK){\n' + connack + 'default:break;}}\n#endif\n'
+    path = BUILD / ("full.c" if enabled else "minimal.c")
+    observer = (
+        "#ifdef MQTT\nstatic void observeConnack(MQTT_Client *client,uint16_t msg_len){switch(MQTT_MSG_TYPE_CONNACK){\n"
+        + connack
+        + "default:break;}}\n#endif\n"
+    )
     path.write_text(prefix + http_headers + cache_headers + observer + suffix)
-    binary = path.with_suffix('')
+    binary = path.with_suffix("")
     # config.h qualifies scalar return values; modern GCC diagnoses it.
-    command = ['gcc', '-std=c99', '-Wall', '-Wextra', '-Werror', '-Wno-unused-parameter', '-Wno-ignored-qualifiers',
-               '-fsanitize=address,undefined', '-fno-omit-frame-pointer',
-               '-I' + str(ROOT / 'tests/support/api-stubs'), '-I' + str(ROOT/'src/core'),
-               '-I' + str(ROOT/'src/httpd'), '-I' + str(ROOT/'src/serial'),
-               '-I' + str(ROOT / 'include'), '-I' + str(ROOT/'src/mqtt'),
-               '-I' + str(ROOT / 'build'), str(path), str(ROOT / 'src/core/api_json.c'), '-o', str(binary)]
+    command = [
+        "gcc",
+        "-std=c99",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-unused-parameter",
+        "-Wno-ignored-qualifiers",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "-I" + str(ROOT / "tests/support/api-stubs"),
+        "-I" + str(ROOT / "src/core"),
+        "-I" + str(ROOT / "src/httpd"),
+        "-I" + str(ROOT / "src/serial"),
+        "-I" + str(ROOT / "include"),
+        "-I" + str(ROOT / "src/mqtt"),
+        "-I" + str(ROOT / "build"),
+        str(path),
+        str(ROOT / "src/core/api_json.c"),
+        "-o",
+        str(binary),
+    ]
     if enabled:
-        command[1:1] = ['-DMQTT', '-DSYSLOG', '-DWEBSERVER', '-DREST', '-DSOCKET']
+        command[1:1] = ["-DMQTT", "-DSYSLOG", "-DWEBSERVER", "-DREST", "-DSOCKET"]
     subprocess.run(command, check=True)
-    output = subprocess.check_output([str(binary)], text=True, env=dict(os.environ, ASAN_OPTIONS='detect_leaks=1'))
-    assert 'SECRET-' not in output
+    output = subprocess.check_output(
+        [str(binary)], text=True, env=dict(os.environ, ASAN_OPTIONS="detect_leaks=1")
+    )
+    assert "SECRET-" not in output
     cases = {}
     for line in output.splitlines():
-        name, code, body = line.split('\t', 2)
+        name, code, body = line.split("\t", 2)
         cases[name] = (int(code), json.loads(body))
-    ap = cases['ap'][1]
-    assert ap['hostname'] == 'host<&"\\雪'
-    assert ap['description'] == 'A\nB\tC"\\雪'
-    assert ap['wifi']['ssid'] == 'AP"\\雪' and ap['wifi']['ip'] == '192.168.4.1'
-    assert ap['wifi']['state'] == 'ready' and ap['wifi']['rssi_dbm'] is None
-    assert ap['system']['uptime_ms'] == 4294967295999
-    assert ap['serial']['target_connected'] is None and ap['serial']['state'] == 'ready'
-    assert cases['half-stop'][1]['serial']['configured_format'] == '8O1.5'
-    assert cases['half-stop'][1]['wifi']['mac'] == cases['ap'][1]['wifi']['mac']
-    assert cases['wrong-password'][1]['wifi']['reason'] == 'wrong_password'
-    assert cases['dhcp'][1]['wifi']['reason'] == 'dhcp_pending'
-    assert cases['dhcp-timeout'][1]['wifi']['reason'] == 'dhcp_timeout'
-    assert cases['dhcp-timeout'][1]['wifi']['state'] == 'failed'
-    assert cases['station'][1]['wifi']['reason'] is None
-    assert cases['station'][1]['wifi']['rssi_dbm'] == -57
-    assert cases['dual'][1]['wifi']['ap_ip'] == '192.168.4.1'
-    assert cases['disabled'][1]['wifi']['state'] == 'disabled'
-    assert cases['loss'][1]['serial']['state'] == 'ready'
-    assert cases['loss'][1]['serial']['loss_detected'] and cases['loss'][1]['serial']['errors']['tcp_output_bytes']==1
-    assert not cases['events-only'][1]['serial']['loss_detected']
-    assert cases['events-only'][1]['serial']['errors']['uart_frames']==2
-    assert cases['each-counter'][1]['serial']['errors']==dict(zip(('uart_ring_bytes','uart_frame_bytes','uart_frames','uart_overruns','tcp_output_bytes','tcp_rejections','tcp_input_alloc','tcp_output_alloc','tcp_send','tcp_hold','web_output_bytes'),range(1,12)))
-    assert cases['events-only'][1]['serial']['errors']['tcp_input_alloc']==3
-    assert cases['web-loss'][1]['serial']['loss_detected'] and cases['web-loss'][1]['serial']['errors']['web_output_bytes']==17
-    assert cases['listener-failed'][1]['serial']['state'] == 'failed'
-    assert cases['programmer-only'][1]['serial_tcp_ports'] == [2323]
-    assert cases['unknown-reset-slot'][1]['firmware']['slot'] is None
-    assert cases['unknown-reset-slot'][1]['system']['reset_reason'] == 'unknown'
-    assert cases['method'][0] == 405
-    assert len(cases['maximum'][1]['hostname']) == 32
-    assert cases['invalid-utf8'][1] == '\ufffd' * 5
-    assert cases['capabilities'][1]['features']['mqtt'] is enabled
-    assert cases['capabilities'][1]['features']['custom_pages'] is enabled
-    assert cases['capabilities'][1]['features']['ota'] is False
+    ap = cases["ap"][1]
+    assert ap["hostname"] == 'host<&"\\雪'
+    assert ap["description"] == 'A\nB\tC"\\雪'
+    assert ap["wifi"]["ssid"] == 'AP"\\雪' and ap["wifi"]["ip"] == "192.168.4.1"
+    assert ap["wifi"]["state"] == "ready" and ap["wifi"]["rssi_dbm"] is None
+    assert ap["system"]["uptime_ms"] == 4294967295999
+    assert ap["serial"]["target_connected"] is None and ap["serial"]["state"] == "ready"
+    assert cases["half-stop"][1]["serial"]["configured_format"] == "8O1.5"
+    assert cases["half-stop"][1]["wifi"]["mac"] == cases["ap"][1]["wifi"]["mac"]
+    assert cases["wrong-password"][1]["wifi"]["reason"] == "wrong_password"
+    assert cases["dhcp"][1]["wifi"]["reason"] == "dhcp_pending"
+    assert cases["dhcp-timeout"][1]["wifi"]["reason"] == "dhcp_timeout"
+    assert cases["dhcp-timeout"][1]["wifi"]["state"] == "failed"
+    assert cases["station"][1]["wifi"]["reason"] is None
+    assert cases["station"][1]["wifi"]["rssi_dbm"] == -57
+    assert cases["dual"][1]["wifi"]["ap_ip"] == "192.168.4.1"
+    assert cases["disabled"][1]["wifi"]["state"] == "disabled"
+    assert cases["loss"][1]["serial"]["state"] == "ready"
+    assert (
+        cases["loss"][1]["serial"]["loss_detected"]
+        and cases["loss"][1]["serial"]["errors"]["tcp_output_bytes"] == 1
+    )
+    assert not cases["events-only"][1]["serial"]["loss_detected"]
+    assert cases["events-only"][1]["serial"]["errors"]["uart_frames"] == 2
+    assert cases["each-counter"][1]["serial"]["errors"] == dict(
+        zip(
+            (
+                "uart_ring_bytes",
+                "uart_frame_bytes",
+                "uart_frames",
+                "uart_overruns",
+                "tcp_output_bytes",
+                "tcp_rejections",
+                "tcp_input_alloc",
+                "tcp_output_alloc",
+                "tcp_send",
+                "tcp_hold",
+                "web_output_bytes",
+            ),
+            range(1, 12),
+        )
+    )
+    assert cases["events-only"][1]["serial"]["errors"]["tcp_input_alloc"] == 3
+    assert (
+        cases["web-loss"][1]["serial"]["loss_detected"]
+        and cases["web-loss"][1]["serial"]["errors"]["web_output_bytes"] == 17
+    )
+    assert cases["listener-failed"][1]["serial"]["state"] == "failed"
+    assert cases["programmer-only"][1]["serial_tcp_ports"] == [2323]
+    assert cases["unknown-reset-slot"][1]["firmware"]["slot"] is None
+    assert cases["unknown-reset-slot"][1]["system"]["reset_reason"] == "unknown"
+    assert cases["method"][0] == 405
+    assert len(cases["maximum"][1]["hostname"]) == 32
+    assert cases["invalid-utf8"][1] == "\ufffd" * 5
+    assert cases["capabilities"][1]["features"]["mqtt"] is enabled
+    assert cases["capabilities"][1]["features"]["custom_pages"] is enabled
+    assert cases["capabilities"][1]["features"]["ota"] is False
     if enabled:
-        assert cases['mqtt-tcp-only'][1]['mqtt']['state'] == 'connecting'
-        assert cases['mqtt-rejected'][1]['mqtt']['state'] == 'failed'
-        assert cases['mqtt-accepted'][1]['mqtt']['state'] == 'connected'
+        assert cases["mqtt-tcp-only"][1]["mqtt"]["state"] == "connecting"
+        assert cases["mqtt-rejected"][1]["mqtt"]["state"] == "failed"
+        assert cases["mqtt-accepted"][1]["mqtt"]["state"] == "connected"
     else:
-        assert 'mqtt' not in ap
-    (BUILD / ('full-results.json' if enabled else 'minimal-results.json')).write_text(json.dumps(cases, indent=2) + '\n')
-print('PASS real status/capabilities: redaction, escaped UTF-8/control strings, bounds, methods, feature guards, truthful states and clock wrap')
+        assert "mqtt" not in ap
+    (BUILD / ("full-results.json" if enabled else "minimal-results.json")).write_text(
+        json.dumps(cases, indent=2) + "\n"
+    )
+print(
+    "PASS real status/capabilities: redaction, escaped UTF-8/control strings, bounds, methods, feature guards, truthful states and clock wrap"
+)

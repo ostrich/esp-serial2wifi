@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """Exercise real management handlers: staged saves, secrets, conflicts and rollback."""
+
 import _paths
 import os, subprocess
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[2]
-OUT=ROOT/'.build-tests/management';OUT.mkdir(parents=True,exist_ok=True)
-(OUT/'sntp.h').write_text('void sntp_stop(void);bool sntp_set_timezone(int8_t);void sntp_setservername(unsigned,char *);void sntp_init(void);\n')
-source=r'''
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / ".build-tests/management"
+OUT.mkdir(parents=True, exist_ok=True)
+(OUT / "sntp.h").write_text(
+    "void sntp_stop(void);bool sntp_set_timezone(int8_t);void sntp_setservername(unsigned,char *);void sntp_init(void);\n"
+)
+source = r"""
 #include <assert.h>
 #include <esp8266.h>
 #define os_malloc malloc
@@ -108,9 +113,48 @@ int main(void){
 #endif
  puts("PASS management saves: redacted reads, sequence, rollback, secret actions, GPIO conflicts and busy guard");
 }
-'''
-(OUT/'test.c').write_text(source)
-for mqtt in [False,True]:
- binary=OUT/('full' if mqtt else 'minimal')
- subprocess.run(['cc','-std=c11','-g','-O1','-fsanitize=address,undefined','-fno-omit-frame-pointer','-Wall','-Wextra','-Werror','-Wno-misleading-indentation','-Wno-ignored-qualifiers',*(['-DMQTT','-DSYSLOG'] if mqtt else []),*['-I'+str(p) for p in [OUT,*[ROOT/p for p in ['tests/support/api-stubs','src/core','src/httpd','src/serial','include','src/mqtt','src/syslog']]]],str(OUT/'test.c'),str(ROOT/'src/core/api_json.c'),str(ROOT/'src/core/network_config.c'),'-o',str(binary)],check=True)
- subprocess.run([str(binary)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
+"""
+(OUT / "test.c").write_text(source)
+for mqtt in [False, True]:
+    binary = OUT / ("full" if mqtt else "minimal")
+    subprocess.run(
+        [
+            "cc",
+            "-std=c11",
+            "-g",
+            "-O1",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-Wno-misleading-indentation",
+            "-Wno-ignored-qualifiers",
+            *(["-DMQTT", "-DSYSLOG"] if mqtt else []),
+            *[
+                "-I" + str(p)
+                for p in [
+                    OUT,
+                    *[
+                        ROOT / p
+                        for p in [
+                            "tests/support/api-stubs",
+                            "src/core",
+                            "src/httpd",
+                            "src/serial",
+                            "include",
+                            "src/mqtt",
+                            "src/syslog",
+                        ]
+                    ],
+                ]
+            ],
+            str(OUT / "test.c"),
+            str(ROOT / "src/core/api_json.c"),
+            str(ROOT / "src/core/network_config.c"),
+            "-o",
+            str(binary),
+        ],
+        check=True,
+    )
+    subprocess.run([str(binary)], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"})

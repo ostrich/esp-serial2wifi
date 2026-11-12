@@ -42,11 +42,11 @@
 #include "serial_api.h"
 #include "operation.h"
 
-#define INIT_DELAY     150   // wait this many millisecs before sending anything
-#define BAUD_INTERVAL  600   // interval after which we change baud rate
-#define PGM_TIMEOUT  20000   // timeout after sync is achieved, in milliseconds
-#define PGM_INTERVAL   200   // send sync at this interval in ms when in programming mode
-#define ATTEMPTS         8   // number of attempts total to make
+#define INIT_DELAY 150    // wait this many millisecs before sending anything
+#define BAUD_INTERVAL 600 // interval after which we change baud rate
+#define PGM_TIMEOUT 20000 // timeout after sync is achieved, in milliseconds
+#define PGM_INTERVAL 200  // send sync at this interval in ms when in programming mode
+#define ATTEMPTS 8        // number of attempts total to make
 
 #define DBG_GPIO5 1 // define to 1 to use GPIO5 to trigger scope
 
@@ -55,43 +55,41 @@
 static ETSTimer optibootTimer;
 static HttpdConnData *readOwner;
 
-static enum {		// overall programming states
-  stateInit = 0,	// initial delay
-  stateSync,		// waiting to hear back
-  stateVar1,		// Steps in reading subsequent parameters
+static enum {    // overall programming states
+  stateInit = 0, // initial delay
+  stateSync,     // waiting to hear back
+  stateVar1,     // Steps in reading subsequent parameters
   stateVar2,
   stateVar3,
-  stateGetSig1,		// Reading device signature
+  stateGetSig1, // Reading device signature
   stateGetSig2,
   stateGetSig3,
   stateGetFuse1,
   stateGetFuse2,
   stateGetFuse3,
-  stateProg,		// programming...
+  stateProg, // programming...
 } progState;
 #ifdef OPTIBOOT_DBG
-static char* progStates[] = { "init", "sync", "var1", "var2", "var3",
-	"sig1", "sig2", "sig3",
-	"fuse1", "fuse2", "fuse3",
-	"prog" };
+static char *progStates[] = {"init", "sync", "var1",  "var2",  "var3",  "sig1",
+                             "sig2", "sig3", "fuse1", "fuse2", "fuse3", "prog"};
 #endif
-static short baudCnt;        // counter for sync attempts at different baud rates
-static short ackWait;        // counter of expected ACKs
-static uint32_t baudRate;    // baud rate at which we're programming
+static short baudCnt;     // counter for sync attempts at different baud rates
+static short ackWait;     // counter of expected ACKs
+static uint32_t baudRate; // baud rate at which we're programming
 
-#define MAX_SAVED   524      // max chars in saved buffer
+#define MAX_SAVED 524 // max chars in saved buffer
 
 // Sequence number of current command/answer. Increment before sending packet.
 static int cur_seqno;
 
 // Structure of a STK500v2 message
 struct packet {
-  uint8_t start;	// 0x1B
+  uint8_t start; // 0x1B
   uint8_t seqno;
   uint8_t ms1, ms2;
-  uint8_t token;	// 0x0E
-  uint8_t *body;	// documented max length is 275
-  uint8_t cksum;	// xor of all bytes including start and body
+  uint8_t token; // 0x0E
+  uint8_t *body; // documented max length is 275
+  uint8_t cksum; // xor of all bytes including start and body
 } pbuf;
 
 // forward function references
@@ -126,7 +124,8 @@ static void debugOn(bool on);
 static void ICACHE_FLASH_ATTR optibootInit() {
   debug_reset();
 
-  serbridgeSetHTTPExclusive(false);deviceOperationEnd(&optibootTimer);
+  serbridgeSetHTTPExclusive(false);
+  deviceOperationEnd(&optibootTimer);
   progState = stateInit;
   baudCnt = 0;
   uart0_baud(flashConfig.baud_rate);
@@ -137,13 +136,19 @@ static void ICACHE_FLASH_ATTR optibootInit() {
   if (optibootData != NULL) {
     if (optibootData->conn != NULL)
       optibootData->conn->cgiPrivData = (void *)-1; // signal that request has been aborted
-    if (optibootData->pageBuf) os_free(optibootData->pageBuf);
-    if (optibootData->saved) os_free(optibootData->saved);
+    if (optibootData->pageBuf)
+      os_free(optibootData->pageBuf);
+    if (optibootData->saved)
+      os_free(optibootData->saved);
     os_free(optibootData);
     optibootData = NULL;
   }
   os_timer_disarm(&optibootTimer);
-  if(pbuf.body){os_free(pbuf.body);pbuf.body=NULL;}readOwner=NULL;
+  if (pbuf.body) {
+    os_free(pbuf.body);
+    pbuf.body = NULL;
+  }
+  readOwner = NULL;
   DBG("OB init\n");
 
   reply_ok = false;
@@ -154,7 +159,7 @@ static void ICACHE_FLASH_ATTR optibootInit() {
 static void ICACHE_FLASH_ATTR appendPretty(char *buf, int max, char *raw, int rawLen) {
   int off = strlen(buf);
   max -= off + 1; // for null termination
-  for (int i=0; i<max && i<rawLen; i++) {
+  for (int i = 0; i < max && i < rawLen; i++) {
     unsigned char c = raw[i++];
     if (c >= ' ' && c <= '~') {
       buf[off++] = c;
@@ -167,8 +172,8 @@ static void ICACHE_FLASH_ATTR appendPretty(char *buf, int max, char *raw, int ra
     } else {
       buf[off++] = '\\';
       buf[off++] = 'x';
-      buf[off++] = '0'+(unsigned char)((c>>4)+((c>>4)>9?7:0));
-      buf[off++] = '0'+(unsigned char)((c&0xf)+((c&0xf)>9?7:0));
+      buf[off++] = '0' + (unsigned char)((c >> 4) + ((c >> 4) > 9 ? 7 : 0));
+      buf[off++] = '0' + (unsigned char)((c & 0xf) + ((c & 0xf) > 9 ? 7 : 0));
     }
   }
   buf[off] = 0;
@@ -176,28 +181,33 @@ static void ICACHE_FLASH_ATTR appendPretty(char *buf, int max, char *raw, int ra
 
 //===== Cgi to reset AVR and get Optiboot into sync
 int ICACHE_FLASH_ATTR cgiMegaSync(HttpdConnData *connData) {
-  if (connData->conn==NULL)
-    return HTTPD_CGI_DONE;	// Connection aborted. Clean up.
+  if (connData->conn == NULL)
+    return HTTPD_CGI_DONE; // Connection aborted. Clean up.
 
-  if(connData->requestType==HTTPD_METHOD_POST&&serbridgeHTTPExclusive()) {
-    errorResponse(connData,409,"A verified MCU programming session is active");return HTTPD_CGI_DONE;
+  if (connData->requestType == HTTPD_METHOD_POST && serbridgeHTTPExclusive()) {
+    errorResponse(connData, 409, "A verified MCU programming session is active");
+    return HTTPD_CGI_DONE;
   }
 
-  if(connData->requestType==HTTPD_METHOD_POST) {
-    if(!apiWrite(connData))return HTTPD_CGI_DONE;
-    if(deviceOperationBusy()||programmingCB||serbridgeInMCUFlashing()||serialInputPending()||serbridge_client_count())return apiError(connData,409,"SERIAL_BUSY","Finish the current device operation first.");
+  if (connData->requestType == HTTPD_METHOD_POST) {
+    if (!apiWrite(connData))
+      return HTTPD_CGI_DONE;
+    if (deviceOperationBusy() || programmingCB || serbridgeInMCUFlashing() ||
+        serialInputPending() || serbridge_client_count())
+      return apiError(connData, 409, "SERIAL_BUSY", "Finish the current device operation first.");
   }
   // check that we know the reset pin, else error out with that
   if (flashConfig.reset_pin < 0) {
     errorResponse(connData, 400, "No reset pin defined");
 
-  }
-  else if (connData->requestType == HTTPD_METHOD_POST) {
-    if (debug()) DBG("cgiMegaSync POST\n");
+  } else if (connData->requestType == HTTPD_METHOD_POST) {
+    if (debug())
+      DBG("cgiMegaSync POST\n");
 
     // issue reset
     optibootInit();
-    if(!deviceOperationBegin(&optibootTimer))return apiError(connData,409,"DEVICE_BUSY","Wait for the current device operation.");
+    if (!deviceOperationBegin(&optibootTimer))
+      return apiError(connData, 409, "DEVICE_BUSY", "Wait for the current device operation.");
     serbridgeSetHTTPExclusive(true);
     baudRate = flashConfig.baud_rate;
     programmingCB = megaUartRecv;
@@ -205,7 +215,7 @@ int ICACHE_FLASH_ATTR cgiMegaSync(HttpdConnData *connData) {
     serbridgeReset();
 #if DBG_GPIO5
     makeGpio(5);
-    gpio_output_set(0, (1<<5), (1<<5), 0); // output 0
+    gpio_output_set(0, (1 << 5), (1 << 5), 0); // output 0
 #endif
 
     // start sync timer
@@ -219,18 +229,20 @@ int ICACHE_FLASH_ATTR cgiMegaSync(HttpdConnData *connData) {
     httpdSend(connData, "", 0);
 
   } else if (connData->requestType == HTTPD_METHOD_GET) {
-    if (debug()) DBG("cgiMegaSync GET\n");
+    if (debug())
+      DBG("cgiMegaSync GET\n");
 
     noCacheHeaders(connData, 200);
     httpdEndHeaders(connData);
     if (!errMessage[0] && progState >= stateProg) {
       char buf[64];
       if (optibootData == NULL)
-	allocateOptibootData();
+        allocateOptibootData();
       DBG("OB got sync\n");
       os_sprintf(buf, "SYNC at %d baud, board %02x.%02x.%02x, hardware v%d, firmware %d.%d",
-	baudRate, optibootData->signature[0], optibootData->signature[1], optibootData->signature[2],
-	optibootData->hardwareVersion, optibootData->firmwareVersionMajor, optibootData->firmwareVersionMinor);
+                 baudRate, optibootData->signature[0], optibootData->signature[1],
+                 optibootData->signature[2], optibootData->hardwareVersion,
+                 optibootData->firmwareVersionMajor, optibootData->firmwareVersionMinor);
       httpdSend(connData, buf, -1);
     } else if (errMessage[0] && progState == stateSync) {
       DBG("OB cannot sync\n");
@@ -256,10 +268,11 @@ int ICACHE_FLASH_ATTR cgiMegaSync(HttpdConnData *connData) {
 static void ICACHE_FLASH_ATTR initPacket() {
   cur_seqno = 0;
 
-  if(pbuf.body)os_free(pbuf.body);
+  if (pbuf.body)
+    os_free(pbuf.body);
   pbuf.body = os_malloc(275);
-  pbuf.start = MESSAGE_START;	// 0x1B
-  pbuf.token = TOKEN;		// 0x0E
+  pbuf.start = MESSAGE_START; // 0x1B
+  pbuf.token = TOKEN;         // 0x0E
 }
 
 static void ICACHE_FLASH_ATTR writePacket() {
@@ -276,7 +289,7 @@ static void ICACHE_FLASH_ATTR writePacket() {
   pbuf.cksum ^= pbuf.ms1;
   pbuf.cksum ^= pbuf.ms2;
   pbuf.cksum ^= pbuf.token;
-  for (i=0; i<len; i++)
+  for (i = 0; i < len; i++)
     pbuf.cksum ^= pbuf.body[i];
 
   uart0_write_char(pbuf.start);
@@ -284,25 +297,25 @@ static void ICACHE_FLASH_ATTR writePacket() {
   uart0_write_char(pbuf.ms1);
   uart0_write_char(pbuf.ms2);
   uart0_write_char(pbuf.token);
-  for (i=0; i<len; i++)
+  for (i = 0; i < len; i++)
     uart0_write_char(pbuf.body[i]);
   uart0_write_char(pbuf.cksum);
 
 #if 1
   if (debug()) {
-    DBG("Packet sent : %02x %02x %02x %02x %02x - ",
-      pbuf.start, pbuf.seqno, pbuf.ms1, pbuf.ms2, pbuf.token);
-    for (i=0; i<len; i++)
+    DBG("Packet sent : %02x %02x %02x %02x %02x - ", pbuf.start, pbuf.seqno, pbuf.ms1, pbuf.ms2,
+        pbuf.token);
+    for (i = 0; i < len; i++)
       DBG(" %02x", pbuf.body[i]);
     DBG(" - %02x\n", pbuf.cksum);
   }
 #else
-    // write a limited amount of the packet
-    DBG("Packet sent : %02x %02x %02x %02x %02x - ",
-      pbuf.start, pbuf.seqno, pbuf.ms1, pbuf.ms2, pbuf.token);
-    for (i=0; i<len && i<16; i++)
-      DBG(" %02x", pbuf.body[i]);
-    DBG(" ...\n");
+  // write a limited amount of the packet
+  DBG("Packet sent : %02x %02x %02x %02x %02x - ", pbuf.start, pbuf.seqno, pbuf.ms1, pbuf.ms2,
+      pbuf.token);
+  for (i = 0; i < len && i < 16; i++)
+    DBG(" %02x", pbuf.body[i]);
+  DBG(" ...\n");
 #endif
 }
 
@@ -347,7 +360,7 @@ static int ICACHE_FLASH_ATTR readPacket() {
   char recv1[8], recv2[4];
   int i;
 
-  uint16_t got1 = uart0_rx_poll(recv1, 5, 50000);	// 5 : start + seqno + 2 x size + token
+  uint16_t got1 = uart0_rx_poll(recv1, 5, 50000); // 5 : start + seqno + 2 x size + token
   if (got1 < 5) {
     DBG("readPacket: got1 %d, expected 5\n", got1);
     return -1;
@@ -366,10 +379,10 @@ static int ICACHE_FLASH_ATTR readPacket() {
 #if 1
   if (debug()) {
     DBG("Packet received : ");
-    for (i=0; i<5; i++)
+    for (i = 0; i < 5; i++)
       DBG(" %02x", recv1[i]);
     DBG(" - ");
-    for (i=0; i<len && i<80; i++)
+    for (i = 0; i < len && i < 80; i++)
       DBG(" %02x", pbuf.body[i]);
     DBG(" -  %02x\n", recv2[0]);
   }
@@ -381,9 +394,9 @@ static int ICACHE_FLASH_ATTR readPacket() {
   // Compute cksum
   uint8_t x = 0;
   x = 0;
-  for (i=0; i<5; i++)
+  for (i = 0; i < 5; i++)
     x ^= recv1[i];
-  for (i=0; i<len; i++)
+  for (i = 0; i < len; i++)
     x ^= pbuf.body[i];
 
   if (x != recv2[0]) {
@@ -401,14 +414,15 @@ static int ICACHE_FLASH_ATTR readSyncPacket() {
   if (len == 11) {
     if (pbuf.body[0] == CMD_SIGN_ON && pbuf.body[1] == STATUS_CMD_OK && pbuf.body[2] == 8) {
       pbuf.body[len] = 0;
-      if (debug()) DBG("Device identifies as %s\n", pbuf.body+3);
+      if (debug())
+        DBG("Device identifies as %s\n", pbuf.body + 3);
       return len;
     } else {
       DBG("Invalid packet\n");
       return len;
     }
   } else if (len < 0) {
-    return len;	// This is bad but already reported this, so just pass the info.
+    return len; // This is bad but already reported this, so just pass the info.
   } else {
     DBG("Sync reply length invalid : %d should be 11\n", len);
     return len;
@@ -430,7 +444,8 @@ static void ICACHE_FLASH_ATTR readRebootMCUReply() {
   if (len == 2) {
     if (pbuf.body[0] == CMD_LEAVE_PROGMODE_ISP && pbuf.body[1] == STATUS_CMD_OK) {
       reply_ok = true;
-      if (debug()) DBG("Rebooting MCU : ok\n");
+      if (debug())
+        DBG("Rebooting MCU : ok\n");
       return;
     }
   }
@@ -440,16 +455,19 @@ static void ICACHE_FLASH_ATTR sendReadFlashQuery(unsigned count) {
   pbuf.ms1 = 0;
   pbuf.ms2 = 4;
   pbuf.body[0] = CMD_READ_FLASH_ISP;
-  pbuf.body[1] = 0;	// Number of bytes to read, MSB first
+  pbuf.body[1] = 0; // Number of bytes to read, MSB first
   pbuf.body[2] = count;
-  pbuf.body[3] = 0x20;	// ??
+  pbuf.body[3] = 0x20; // ??
 
   writePacket();
 }
 
-static void ICACHE_FLASH_ATTR readReadFlashReply(char *buf,unsigned count) {
-  int len=readPacket();reply_ok=len==(int)count+3&&pbuf.body[0]==CMD_READ_FLASH_ISP&&pbuf.body[1]==STATUS_CMD_OK;
-  if(reply_ok)os_memcpy(buf,pbuf.body+2,count);
+static void ICACHE_FLASH_ATTR readReadFlashReply(char *buf, unsigned count) {
+  int len = readPacket();
+  reply_ok =
+      len == (int)count + 3 && pbuf.body[0] == CMD_READ_FLASH_ISP && pbuf.body[1] == STATUS_CMD_OK;
+  if (reply_ok)
+    os_memcpy(buf, pbuf.body + 2, count);
 }
 
 static void ICACHE_FLASH_ATTR sendLoadAddressQuery(uint32_t addr) {
@@ -482,13 +500,13 @@ static void ICACHE_FLASH_ATTR readLoadAddressReply() {
     }
   }
 
-  DBG("LoadAddress : %02x %02x (expected %02x %02x), len %d exp 2\n",
-    pbuf.body[0], pbuf.body[1], CMD_LOAD_ADDRESS, STATUS_CMD_OK, len);
+  DBG("LoadAddress : %02x %02x (expected %02x %02x), len %d exp 2\n", pbuf.body[0], pbuf.body[1],
+      CMD_LOAD_ADDRESS, STATUS_CMD_OK, len);
 }
 
 static void ICACHE_FLASH_ATTR sendProgramPageQuery(char *data, int pgmLen) {
   int totalLen = pgmLen + 10;
-  int mode = 0xC1;		// already includes the 0x80 "write page" bit
+  int mode = 0xC1; // already includes the 0x80 "write page" bit
 
   pbuf.ms1 = totalLen >> 8;
   pbuf.ms2 = totalLen & 0xFF;
@@ -496,19 +514,19 @@ static void ICACHE_FLASH_ATTR sendProgramPageQuery(char *data, int pgmLen) {
   pbuf.body[0] = CMD_PROGRAM_FLASH_ISP;
   pbuf.body[1] = pgmLen >> 8;
   pbuf.body[2] = pgmLen & 0xFF;
-  pbuf.body[3] = mode;		// mode byte
-  pbuf.body[4] = 0x0A;		// delay
-  pbuf.body[5] = 0x40;		// cmd1
-  pbuf.body[6] = 0x4C;		// cmd2
-  pbuf.body[7] = 0x20;		// cmd3
-  pbuf.body[8] = 0x00;		// poll1
-  pbuf.body[9] = 0x00;		// poll2
-  for (int i=0, j=10; i<pgmLen; i++, j++)
+  pbuf.body[3] = mode; // mode byte
+  pbuf.body[4] = 0x0A; // delay
+  pbuf.body[5] = 0x40; // cmd1
+  pbuf.body[6] = 0x4C; // cmd2
+  pbuf.body[7] = 0x20; // cmd3
+  pbuf.body[8] = 0x00; // poll1
+  pbuf.body[9] = 0x00; // poll2
+  for (int i = 0, j = 10; i < pgmLen; i++, j++)
     pbuf.body[j] = data[i];
 
-      // os_delay_us(4500L);	// Flashing takes about 4.5ms
+  // os_delay_us(4500L);	// Flashing takes about 4.5ms
   writePacket();
-      // os_delay_us(4500L);	// Flashing takes about 4.5ms
+  // os_delay_us(4500L);	// Flashing takes about 4.5ms
 }
 
 static void ICACHE_FLASH_ATTR readProgramPageReply() {
@@ -525,18 +543,23 @@ static void ICACHE_FLASH_ATTR readProgramPageReply() {
 
 static void ICACHE_FLASH_ATTR allocateOptibootData() {
   optibootData = os_zalloc(sizeof(struct optibootData));
-  char *saved = os_zalloc(MAX_SAVED+1); // need space for string terminator
+  char *saved = os_zalloc(MAX_SAVED + 1); // need space for string terminator
   char *pageBuf = os_zalloc(PGM_PAGE_BUFFER_BYTES);
   if (!optibootData || !pageBuf || !saved) {
-    if(optibootData)os_free(optibootData);optibootData=NULL;
-    if(pageBuf)os_free(pageBuf);if(saved)os_free(saved);
+    if (optibootData)
+      os_free(optibootData);
+    optibootData = NULL;
+    if (pageBuf)
+      os_free(pageBuf);
+    if (saved)
+      os_free(saved);
     return;
   }
   optibootData->pageBuf = pageBuf;
   optibootData->saved = saved;
   optibootData->startTime = system_get_time();
   optibootData->mega = true;
-  optibootData->pgmSz = 256;			// Try to force this to write 256 bytes per page
+  optibootData->pgmSz = 256; // Try to force this to write 256 bytes per page
   DBG("OB data alloc\n");
 
   optibootData->address = optibootData->segment;
@@ -552,20 +575,28 @@ static void ICACHE_FLASH_ATTR allocateOptibootData() {
 int ICACHE_FLASH_ATTR cgiMegaData(HttpdConnData *connData) {
   // DBG("cgiMegaData state=%d postLen=%d\n", progState, connData->post->len);
 
-  if(connData->conn==NULL) {
-    if(optibootData&&optibootData->conn==connData)optibootInit();
+  if (connData->conn == NULL) {
+    if (optibootData && optibootData->conn == connData)
+      optibootInit();
     return HTTPD_CGI_DONE;
   }
-  if(!apiWrite(connData))return HTTPD_CGI_DONE;
-  if(readOwner){errorResponse(connData,409,"Wait for MCU readback");return HTTPD_CGI_DONE;}
-  if(connData->requestType!=HTTPD_METHOD_POST||!connData->post) {
-    errorResponse(connData,405,"Use POST with raw Intel HEX data");return HTTPD_CGI_DONE;
+  if (!apiWrite(connData))
+    return HTTPD_CGI_DONE;
+  if (readOwner) {
+    errorResponse(connData, 409, "Wait for MCU readback");
+    return HTTPD_CGI_DONE;
   }
-  if(optibootData&&optibootData->conn!=connData) {
-    errorResponse(connData,409,"Another MCU upload is active");return HTTPD_CGI_DONE;
+  if (connData->requestType != HTTPD_METHOD_POST || !connData->post) {
+    errorResponse(connData, 405, "Use POST with raw Intel HEX data");
+    return HTTPD_CGI_DONE;
+  }
+  if (optibootData && optibootData->conn != connData) {
+    errorResponse(connData, 409, "Another MCU upload is active");
+    return HTTPD_CGI_DONE;
   }
   if (!optibootData)
-    if (debug()) DBG("OB pgm: state=%d postLen=%d\n", progState, connData->post->len);
+    if (debug())
+      DBG("OB pgm: state=%d postLen=%d\n", progState, connData->post->len);
 
   // check that we have sync
   if (errMessage[0] || progState < stateProg) {
@@ -584,9 +615,11 @@ int ICACHE_FLASH_ATTR cgiMegaData(HttpdConnData *connData) {
   // allocate data structure to track programming
   if (!optibootData) {
     allocateOptibootData();
-    if(optibootData)optibootData->conn=connData;
+    if (optibootData)
+      optibootData->conn = connData;
     if (!optibootData || !optibootData->pageBuf || !optibootData->saved) {
-      errorResponse(connData, 503, "Out of memory");optibootInit();
+      errorResponse(connData, 503, "Out of memory");
+      optibootInit();
       return HTTPD_CGI_DONE;
     }
   }
@@ -598,12 +631,13 @@ int ICACHE_FLASH_ATTR cgiMegaData(HttpdConnData *connData) {
     // first fill-up the saved buffer
     short saveLen = strlen(saved);
     if (saveLen < MAX_SAVED) {
-      short cpy = MAX_SAVED-saveLen;
-      if (cpy > post->buffLen) cpy = post->buffLen;
-      os_memcpy(saved+saveLen, post->buff, cpy);
+      short cpy = MAX_SAVED - saveLen;
+      if (cpy > post->buffLen)
+        cpy = post->buffLen;
+      os_memcpy(saved + saveLen, post->buff, cpy);
       saveLen += cpy;
       saved[saveLen] = 0; // string terminator
-      os_memmove(post->buff, post->buff+cpy, post->buffLen-cpy);
+      os_memmove(post->buff, post->buff + cpy, post->buffLen - cpy);
       post->buffLen -= cpy;
       //DBG("OB cp %d buff->saved\n", cpy);
     }
@@ -616,39 +650,40 @@ int ICACHE_FLASH_ATTR cgiMegaData(HttpdConnData *connData) {
         skip++;
       if (skip > 0) {
         // shift out cr/lf (keep terminating \0)
-        os_memmove(saved, saved+skip, saveLen+1-skip);
+        os_memmove(saved, saved + skip, saveLen + 1 - skip);
         saveLen -= skip;
-        if (saveLen < 11) break;
+        if (saveLen < 11)
+          break;
         DBG("OB skip %d cr/lf\n", skip);
       }
 
       // inspect whether we have a proper record start
       if (saved[0] != ':') {
         DBG("OB found non-: start\n");
-        os_strcpy(errMessage,"Expected colon at the start of a HEX record");
+        os_strcpy(errMessage, "Expected colon at the start of a HEX record");
         errorResponse(connData, 400, errMessage);
         optibootInit();
         return HTTPD_CGI_DONE;
       }
 
-      if (!checkHex(saved+1, 2)) {
+      if (!checkHex(saved + 1, 2)) {
         errorResponse(connData, 400, errMessage);
         optibootInit();
         return HTTPD_CGI_DONE;
       }
-      uint8_t recLen = getHexValue(saved+1, 2);
+      uint8_t recLen = getHexValue(saved + 1, 2);
       //DBG("OB record %d\n", recLen);
 
       // process record
-      if (saveLen >= 11+recLen*2) {
-        if (!processRecord(saved, 11+recLen*2)) {
+      if (saveLen >= 11 + recLen * 2) {
+        if (!processRecord(saved, 11 + recLen * 2)) {
           DBG("OB process err %s\n", errMessage);
           errorResponse(connData, 400, errMessage);
           optibootInit();
           return HTTPD_CGI_DONE;
         }
-        short shift = 11+recLen*2;
-        os_memmove(saved, saved+shift, saveLen+1-shift);
+        short shift = 11 + recLen * 2;
+        os_memmove(saved, saved + shift, saveLen + 1 - shift);
         saveLen -= shift;
         //DBG("OB %d byte record\n", shift);
       } else {
@@ -666,12 +701,12 @@ int ICACHE_FLASH_ATTR cgiMegaData(HttpdConnData *connData) {
   if (optibootData->eof) {
     code = 200;
     // calculate some stats
-    float dt = ((system_get_time() - optibootData->startTime)/1000)/1000.0; // in seconds
+    float dt = ((system_get_time() - optibootData->startTime) / 1000) / 1000.0; // in seconds
     uint32_t pgmDone = optibootData->pgmDone;
     optibootInit();
-    os_sprintf(errMessage, "Success. %d bytes at %d baud in %d.%ds, %dB/s %d%% efficient",
-        pgmDone, baudRate, (int)dt, (int)(dt*10)%10, (int)(pgmDone/dt),
-        (int)(100.0*(10.0*pgmDone/baudRate)/dt));
+    os_sprintf(errMessage, "Success. %d bytes at %d baud in %d.%ds, %dB/s %d%% efficient", pgmDone,
+               baudRate, (int)dt, (int)(dt * 10) % 10, (int)(pgmDone / dt),
+               (int)(100.0 * (10.0 * pgmDone / baudRate) / dt));
   } else {
     code = 400;
     optibootInit();
@@ -692,7 +727,8 @@ bool ICACHE_FLASH_ATTR megaProgramPage(void) {
   if (optibootData == NULL)
     allocateOptibootData();
   if (debug())
-    DBG("programPage len %d addr 0x%04x\n", optibootData->pageLen, optibootData->address + optibootData->segment);
+    DBG("programPage len %d addr 0x%04x\n", optibootData->pageLen,
+        optibootData->address + optibootData->segment);
 
   if (optibootData->pageLen == 0)
     return true;
@@ -705,7 +741,7 @@ bool ICACHE_FLASH_ATTR megaProgramPage(void) {
 
   // send address to optiboot (little endian format)
 #ifdef DBG_GPIO5
-  gpio_output_set((1<<5), 0, (1<<5), 0); // output 1
+  gpio_output_set((1 << 5), 0, (1 << 5), 0); // output 1
 #endif
   ackWait++;
 
@@ -714,7 +750,7 @@ bool ICACHE_FLASH_ATTR megaProgramPage(void) {
   readLoadAddressReply();
 
   armTimer(PGM_TIMEOUT);
-  if (! reply_ok) {
+  if (!reply_ok) {
     DBG("OB pgm failed in load address\n");
     return false;
   }
@@ -733,7 +769,7 @@ bool ICACHE_FLASH_ATTR megaProgramPage(void) {
   }
 
   // shift data out of buffer
-  os_memmove(optibootData->pageBuf, optibootData->pageBuf+pgmLen, optibootData->pageLen-pgmLen);
+  os_memmove(optibootData->pageBuf, optibootData->pageBuf + pgmLen, optibootData->pageLen - pgmLen);
   optibootData->pageLen -= pgmLen;
 #if 1
   optibootData->address += pgmLen;
@@ -755,7 +791,7 @@ static void ICACHE_FLASH_ATTR armTimer(uint32_t ms) {
   os_timer_arm(&optibootTimer, ms, 0);
 }
 
-static int baudRates[] = { 0, 9600, 57600, 115200 };
+static int baudRates[] = {0, 9600, 57600, 115200};
 
 static void ICACHE_FLASH_ATTR setBaud() {
   baudRate = baudRates[(baudCnt++) % 4];
@@ -774,47 +810,51 @@ static void ICACHE_FLASH_ATTR initBaud() {
  * 2. in other cases, timeouts are a problem, we failed somewhere.
  */
 static void ICACHE_FLASH_ATTR megaTimerCB(void *arg) {
-  if (debug()) DBG("megaTimerCB state %d (%s)\n", progState, progStates[progState]);
+  if (debug())
+    DBG("megaTimerCB state %d (%s)\n", progState, progStates[progState]);
 
   switch (progState) {
-    case stateInit: // initial delay expired, send sync chars
-      initPacket();
-      if(!pbuf.body){optibootInit();return;}
-
-      // DBG("Reset pin %d to LOW ...", flashConfig.reset_pin);
-      GPIO_OUTPUT_SET(flashConfig.reset_pin, 0);
-      os_delay_us(2000L);	// Keep reset line low for 2 ms
-      GPIO_OUTPUT_SET(flashConfig.reset_pin, 1);
-      // DBG(" and up again.\n");
-
-      os_delay_us(2000L);	// Now wait an additional 2 ms before sending packets
-
-      // Send a couple of packets, until we get a reply
-      int ok = -1, i = 0;
-      while (ok < 0 && i++ < 8) {
-        os_delay_us(200L);
-	sendSyncPacket();
-	cur_seqno++;
-	ok = readSyncPacket();
-      }
-      if (ok < 0)
-        break;		// Don't increment progState
-
-      progState++;
-
-      // Discard input until now
-      responseLen = 0;
-
-      // Send a query, reply to be picked up by megaUartRecv().
-      sendQueryPacket(PARAM_HW_VER);
-
-      // Trigger timeout
-      armTimer(BAUD_INTERVAL-INIT_DELAY);
+  case stateInit: // initial delay expired, send sync chars
+    initPacket();
+    if (!pbuf.body) {
+      optibootInit();
       return;
-    case stateSync: // oops, must have not heard back!?
-    case stateProg: // we're programming and we timed-out of inaction
-    default: // we're trying to get some info from optiboot and it should have responded!
-      break;
+    }
+
+    // DBG("Reset pin %d to LOW ...", flashConfig.reset_pin);
+    GPIO_OUTPUT_SET(flashConfig.reset_pin, 0);
+    os_delay_us(2000L); // Keep reset line low for 2 ms
+    GPIO_OUTPUT_SET(flashConfig.reset_pin, 1);
+    // DBG(" and up again.\n");
+
+    os_delay_us(2000L); // Now wait an additional 2 ms before sending packets
+
+    // Send a couple of packets, until we get a reply
+    int ok = -1, i = 0;
+    while (ok < 0 && i++ < 8) {
+      os_delay_us(200L);
+      sendSyncPacket();
+      cur_seqno++;
+      ok = readSyncPacket();
+    }
+    if (ok < 0)
+      break; // Don't increment progState
+
+    progState++;
+
+    // Discard input until now
+    responseLen = 0;
+
+    // Send a query, reply to be picked up by megaUartRecv().
+    sendQueryPacket(PARAM_HW_VER);
+
+    // Trigger timeout
+    armTimer(BAUD_INTERVAL - INIT_DELAY);
+    return;
+  case stateSync: // oops, must have not heard back!?
+  case stateProg: // we're programming and we timed-out of inaction
+  default:        // we're trying to get some info from optiboot and it should have responded!
+    break;
   }
   optibootInit();
 }
@@ -832,25 +872,25 @@ static void ICACHE_FLASH_ATTR megaUartRecv(char *buf, short length) {
   int ok;
 
   //if (progState > stateGetSig3)
-    if (debug()) {
-      DBG("megaUartRecv %d bytes, ", length);
-      for (int i=0; i<length; i++)
-        DBG(" %02x", buf[i]);
-      DBG("\n");
-    }
+  if (debug()) {
+    DBG("megaUartRecv %d bytes, ", length);
+    for (int i = 0; i < length; i++)
+      DBG(" %02x", buf[i]);
+    DBG("\n");
+  }
 
   // append what we got to what we have accumulated
-  if (responseLen < RESP_SZ-1) {
-    char *rb = responseBuf+responseLen;
-    for (short i=0; i<length && (rb-responseBuf)<(RESP_SZ-1); i++)
+  if (responseLen < RESP_SZ - 1) {
+    char *rb = responseBuf + responseLen;
+    for (short i = 0; i < length && (rb - responseBuf) < (RESP_SZ - 1); i++)
       *rb++ = buf[i];
-    responseLen = rb-responseBuf;
+    responseLen = rb - responseBuf;
     responseBuf[responseLen] = 0; // string terminator
   }
 
   // dispatch based on the current state
   switch (progState) {
-  case stateInit:  // we haven't sent anything, this must be garbage
+  case stateInit: // we haven't sent anything, this must be garbage
     break;
   case stateSync: // we're trying to get a sync response
     ok = 0;
@@ -860,11 +900,12 @@ static void ICACHE_FLASH_ATTR megaUartRecv(char *buf, short length) {
       // break;
     }
     if (responseLen >= 9) {
-      if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_GET_PARAMETER && responseBuf[6] == STATUS_CMD_OK) {
+      if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_GET_PARAMETER &&
+          responseBuf[6] == STATUS_CMD_OK) {
         optibootData->hardwareVersion = responseBuf[7];
-	ok++;
+        ok++;
       }
-      os_memcpy(responseBuf, responseBuf+9, responseLen-9);
+      os_memcpy(responseBuf, responseBuf + 9, responseLen - 9);
       responseLen -= 9;
     }
     progState++;
@@ -873,11 +914,12 @@ static void ICACHE_FLASH_ATTR megaUartRecv(char *buf, short length) {
     break;
   case stateVar1:
     if (responseLen >= 9) {
-      if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_GET_PARAMETER && responseBuf[6] == STATUS_CMD_OK) {
+      if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_GET_PARAMETER &&
+          responseBuf[6] == STATUS_CMD_OK) {
         optibootData->firmwareVersionMajor = responseBuf[7];
-	ok++;
+        ok++;
       }
-      os_memcpy(responseBuf, responseBuf+9, responseLen-9);
+      os_memcpy(responseBuf, responseBuf + 9, responseLen - 9);
       responseLen -= 9;
     }
     progState++;
@@ -886,11 +928,12 @@ static void ICACHE_FLASH_ATTR megaUartRecv(char *buf, short length) {
     break;
   case stateVar2:
     if (responseLen >= 9) {
-      if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_GET_PARAMETER && responseBuf[6] == STATUS_CMD_OK) {
+      if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_GET_PARAMETER &&
+          responseBuf[6] == STATUS_CMD_OK) {
         optibootData->firmwareVersionMinor = responseBuf[7];
-	ok++;
+        ok++;
       }
-      os_memcpy(responseBuf, responseBuf+9, responseLen-9);
+      os_memcpy(responseBuf, responseBuf + 9, responseLen - 9);
       responseLen -= 9;
     }
     progState++;
@@ -899,19 +942,21 @@ static void ICACHE_FLASH_ATTR megaUartRecv(char *buf, short length) {
     break;
   case stateVar3:
     if (responseLen >= 9) {
-      if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_GET_PARAMETER && responseBuf[6] == STATUS_CMD_OK) {
+      if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_GET_PARAMETER &&
+          responseBuf[6] == STATUS_CMD_OK) {
         optibootData->vTarget = responseBuf[7];
-	ok++;
+        ok++;
       }
-      os_memcpy(responseBuf, responseBuf+9, responseLen-9);
+      os_memcpy(responseBuf, responseBuf + 9, responseLen - 9);
       responseLen -= 9;
     }
 
     progState++;
     sendQuerySignaturePacket(0);
     if (debug())
-      DBG("Hardware version %d, firmware %d.%d. Vtarget = %d.%d V\n",
-        optibootData->hardwareVersion, optibootData->firmwareVersionMajor, optibootData->firmwareVersionMinor, optibootData->vTarget / 16, optibootData->vTarget % 16);
+      DBG("Hardware version %d, firmware %d.%d. Vtarget = %d.%d V\n", optibootData->hardwareVersion,
+          optibootData->firmwareVersionMajor, optibootData->firmwareVersionMinor,
+          optibootData->vTarget / 16, optibootData->vTarget % 16);
     armTimer(PGM_INTERVAL); // reset timer
     break;
   case stateGetSig1:
@@ -919,7 +964,7 @@ static void ICACHE_FLASH_ATTR megaUartRecv(char *buf, short length) {
       if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_SPI_MULTI && responseBuf[3] == 7) {
         optibootData->signature[0] = responseBuf[10];
       }
-      os_memcpy(responseBuf, responseBuf+13, responseLen-13);
+      os_memcpy(responseBuf, responseBuf + 13, responseLen - 13);
       responseLen -= 13;
       progState++;
       sendQuerySignaturePacket(1);
@@ -931,7 +976,7 @@ static void ICACHE_FLASH_ATTR megaUartRecv(char *buf, short length) {
       if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_SPI_MULTI && responseBuf[3] == 7) {
         optibootData->signature[1] = responseBuf[10];
       }
-      os_memcpy(responseBuf, responseBuf+13, responseLen-13);
+      os_memcpy(responseBuf, responseBuf + 13, responseLen - 13);
       responseLen -= 13;
       progState++;
       sendQuerySignaturePacket(2);
@@ -943,11 +988,13 @@ static void ICACHE_FLASH_ATTR megaUartRecv(char *buf, short length) {
       if (responseBuf[4] == TOKEN && responseBuf[5] == CMD_SPI_MULTI && responseBuf[3] == 7) {
         optibootData->signature[2] = responseBuf[10];
       }
-      os_memcpy(responseBuf, responseBuf+13, responseLen-13);
+      os_memcpy(responseBuf, responseBuf + 13, responseLen - 13);
       responseLen -= 13;
       progState++;
 
-      if (debug()) DBG("Board signature %02x.%02x.%02x\n", optibootData->signature[0], optibootData->signature[1], optibootData->signature[2]);
+      if (debug())
+        DBG("Board signature %02x.%02x.%02x\n", optibootData->signature[0],
+            optibootData->signature[1], optibootData->signature[2]);
       sendReadFuseQuery('l');
     }
     armTimer(PGM_INTERVAL); // reset timer
@@ -978,65 +1025,146 @@ static void ICACHE_FLASH_ATTR megaUartRecv(char *buf, short length) {
   }
 }
 
-typedef struct {uint32_t address;unsigned remaining;} MegaRead;
+typedef struct {
+  uint32_t address;
+  unsigned remaining;
+} MegaRead;
 static bool ICACHE_FLASH_ATTR megaReady(HttpdConnData *c) {
-  if(!apiWrite(c))return false;
-  if(!deviceOperationOwned(&optibootTimer)||programmingCB!=megaUartRecv||!pbuf.body||progState<stateProg) {
-    apiError(c,409,"PROGRAMMING_BUSY","Synchronize the Mega programmer first.");return false;
+  if (!apiWrite(c))
+    return false;
+  if (!deviceOperationOwned(&optibootTimer) || programmingCB != megaUartRecv || !pbuf.body ||
+      progState < stateProg) {
+    apiError(c, 409, "PROGRAMMING_BUSY", "Synchronize the Mega programmer first.");
+    return false;
   }
-  if(optibootData||(readOwner&&readOwner!=c)){apiError(c,409,"PROGRAMMING_BUSY","Wait for the active MCU upload.");return false;}
+  if (optibootData || (readOwner && readOwner != c)) {
+    apiError(c, 409, "PROGRAMMING_BUSY", "Wait for the active MCU upload.");
+    return false;
+  }
   return true;
 }
 int ICACHE_FLASH_ATTR cgiMegaRead(HttpdConnData *c) {
-  MegaRead *read=c->cgiPrivData;
-  if(!c->conn){if(read)os_free(read);if(readOwner==c)readOwner=NULL;c->cgiPrivData=NULL;return HTTPD_CGI_DONE;}
-  if(!read) {
-    if(!megaReady(c))return HTTPD_CGI_DONE;
-    const char *p=c->url+14;uint32_t numbers[2]={0};
-    for(unsigned i=0;i<2;i++) {
-      if(p[0]=='0'&&(p[1]=='x'||p[1]=='X'))p+=2;
-      unsigned digits=0;while(*p&&*p!=',') {unsigned ch=(unsigned char)*p++,v;
-        if(ch>='0'&&ch<='9')v=ch-'0';else if(ch>='a'&&ch<='f')v=ch-'a'+10;else if(ch>='A'&&ch<='F')v=ch-'A'+10;else goto invalid;
-        if(++digits>8)goto invalid;numbers[i]=(numbers[i]<<4)|v;
-      }
-      if(!digits||(i==0?*p++!=',':*p!=0))goto invalid;
-    }
-    if(!numbers[1]||numbers[1]>4096||numbers[0]>=262144||numbers[1]>262144-numbers[0]||(numbers[0]&1))goto invalid;
-    read=os_malloc(sizeof(*read));if(!read)return apiError(c,503,"READ_MEMORY","Not enough memory for readback.");
-    read->address=numbers[0];read->remaining=numbers[1];c->cgiPrivData=read;readOwner=c;
-    sendLoadAddressQuery(read->address);reply_ok=false;readLoadAddressReply();
-    if(!reply_ok){os_free(read);readOwner=NULL;c->cgiPrivData=NULL;return apiError(c,502,"READ_FAILED","MCU address selection failed.");}
-    noCacheHeaders(c,200);httpdHeader(c,"Content-Type","text/plain");httpdEndHeaders(c);return HTTPD_CGI_MORE;
+  MegaRead *read = c->cgiPrivData;
+  if (!c->conn) {
+    if (read)
+      os_free(read);
+    if (readOwner == c)
+      readOwner = NULL;
+    c->cgiPrivData = NULL;
+    return HTTPD_CGI_DONE;
   }
-  if(!deviceOperationOwned(&optibootTimer)||programmingCB!=megaUartRecv){os_free(read);readOwner=NULL;c->cgiPrivData=NULL;espconn_disconnect(c->conn);return HTTPD_CGI_DONE;}
-  unsigned n=read->remaining>16?16:read->remaining;
-  char bytes[16],line[60];reply_ok=false;sendReadFlashQuery(n);readReadFlashReply(bytes,n);
-  if(!reply_ok){os_free(read);readOwner=NULL;c->cgiPrivData=NULL;espconn_disconnect(c->conn);return HTTPD_CGI_DONE;}
-  unsigned used=os_sprintf(line,"%08x: ",read->address);
-  for(unsigned i=0;i<n;i++)used+=os_sprintf(line+used,"%02x ",(unsigned char)bytes[i]);line[used++]='\n';
-  if(!httpdSend(c,line,used)){os_free(read);readOwner=NULL;c->cgiPrivData=NULL;espconn_disconnect(c->conn);return HTTPD_CGI_DONE;}
-  read->remaining-=n;read->address+=n;
-  if(read->remaining)return HTTPD_CGI_MORE;
-  os_free(read);readOwner=NULL;c->cgiPrivData=NULL;return HTTPD_CGI_DONE;
-invalid:return apiError(c,422,"READ_RANGE","Use a hexadecimal address,length; at most 4096 bytes within Mega flash.");
+  if (!read) {
+    if (!megaReady(c))
+      return HTTPD_CGI_DONE;
+    const char *p = c->url + 14;
+    uint32_t numbers[2] = {0};
+    for (unsigned i = 0; i < 2; i++) {
+      if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
+        p += 2;
+      unsigned digits = 0;
+      while (*p && *p != ',') {
+        unsigned ch = (unsigned char)*p++, v;
+        if (ch >= '0' && ch <= '9')
+          v = ch - '0';
+        else if (ch >= 'a' && ch <= 'f')
+          v = ch - 'a' + 10;
+        else if (ch >= 'A' && ch <= 'F')
+          v = ch - 'A' + 10;
+        else
+          goto invalid;
+        if (++digits > 8)
+          goto invalid;
+        numbers[i] = (numbers[i] << 4) | v;
+      }
+      if (!digits || (i == 0 ? *p++ != ',' : *p != 0))
+        goto invalid;
+    }
+    if (!numbers[1] || numbers[1] > 4096 || numbers[0] >= 262144 ||
+        numbers[1] > 262144 - numbers[0] || (numbers[0] & 1))
+      goto invalid;
+    read = os_malloc(sizeof(*read));
+    if (!read)
+      return apiError(c, 503, "READ_MEMORY", "Not enough memory for readback.");
+    read->address = numbers[0];
+    read->remaining = numbers[1];
+    c->cgiPrivData = read;
+    readOwner = c;
+    sendLoadAddressQuery(read->address);
+    reply_ok = false;
+    readLoadAddressReply();
+    if (!reply_ok) {
+      os_free(read);
+      readOwner = NULL;
+      c->cgiPrivData = NULL;
+      return apiError(c, 502, "READ_FAILED", "MCU address selection failed.");
+    }
+    noCacheHeaders(c, 200);
+    httpdHeader(c, "Content-Type", "text/plain");
+    httpdEndHeaders(c);
+    return HTTPD_CGI_MORE;
+  }
+  if (!deviceOperationOwned(&optibootTimer) || programmingCB != megaUartRecv) {
+    os_free(read);
+    readOwner = NULL;
+    c->cgiPrivData = NULL;
+    espconn_disconnect(c->conn);
+    return HTTPD_CGI_DONE;
+  }
+  unsigned n = read->remaining > 16 ? 16 : read->remaining;
+  char bytes[16], line[60];
+  reply_ok = false;
+  sendReadFlashQuery(n);
+  readReadFlashReply(bytes, n);
+  if (!reply_ok) {
+    os_free(read);
+    readOwner = NULL;
+    c->cgiPrivData = NULL;
+    espconn_disconnect(c->conn);
+    return HTTPD_CGI_DONE;
+  }
+  unsigned used = os_sprintf(line, "%08x: ", read->address);
+  for (unsigned i = 0; i < n; i++)
+    used += os_sprintf(line + used, "%02x ", (unsigned char)bytes[i]);
+  line[used++] = '\n';
+  if (!httpdSend(c, line, used)) {
+    os_free(read);
+    readOwner = NULL;
+    c->cgiPrivData = NULL;
+    espconn_disconnect(c->conn);
+    return HTTPD_CGI_DONE;
+  }
+  read->remaining -= n;
+  read->address += n;
+  if (read->remaining)
+    return HTTPD_CGI_MORE;
+  os_free(read);
+  readOwner = NULL;
+  c->cgiPrivData = NULL;
+  return HTTPD_CGI_DONE;
+invalid:
+  return apiError(c, 422, "READ_RANGE",
+                  "Use a hexadecimal address,length; at most 4096 bytes within Mega flash.");
 }
 
 void ICACHE_FLASH_ATTR sendReadFuseQuery(char fuse) {
   pbuf.ms1 = 0;
   pbuf.ms2 = 8;
-  pbuf.body[0] = CMD_SPI_MULTI;		// 0x1D
+  pbuf.body[0] = CMD_SPI_MULTI; // 0x1D
   pbuf.body[1] = 4;
   pbuf.body[2] = 4;
   pbuf.body[3] = 0;
   switch (fuse) {
   case 'l':
-    pbuf.body[4] = 0x50; pbuf.body[5] = 0x00;
+    pbuf.body[4] = 0x50;
+    pbuf.body[5] = 0x00;
     break;
   case 'h':
-    pbuf.body[4] = 0x58; pbuf.body[5] = 0x08;
+    pbuf.body[4] = 0x58;
+    pbuf.body[5] = 0x08;
     break;
   case 'e':
-    pbuf.body[4] = 0x50; pbuf.body[5] = 0x08;
+    pbuf.body[4] = 0x50;
+    pbuf.body[5] = 0x08;
     break;
   }
   pbuf.body[6] = 0;
@@ -1092,8 +1220,10 @@ int ICACHE_FLASH_ATTR readFuse(char fuse) {
  * /pgmmega/fuse/1 writes fuse 1
  */
 int ICACHE_FLASH_ATTR cgiMegaFuse(HttpdConnData *connData) {
-  if(!connData->conn)return HTTPD_CGI_DONE;
-  if(!megaReady(connData))return HTTPD_CGI_DONE;
+  if (!connData->conn)
+    return HTTPD_CGI_DONE;
+  if (!megaReady(connData))
+    return HTTPD_CGI_DONE;
   DBG("cgiMegaFuse %s\n", connData->url);
 
   // decode url
@@ -1124,8 +1254,10 @@ int ICACHE_FLASH_ATTR cgiMegaFuse(HttpdConnData *connData) {
  * synchronized communication with it.
  */
 int ICACHE_FLASH_ATTR cgiMegaRebootMCU(HttpdConnData *connData) {
-  if(!connData->conn)return HTTPD_CGI_DONE;
-  if(!megaReady(connData))return HTTPD_CGI_DONE;
+  if (!connData->conn)
+    return HTTPD_CGI_DONE;
+  if (!megaReady(connData))
+    return HTTPD_CGI_DONE;
   sendRebootMCUQuery();
   readRebootMCUReply();
 
@@ -1136,7 +1268,8 @@ int ICACHE_FLASH_ATTR cgiMegaRebootMCU(HttpdConnData *connData) {
   } else {
     errorResponse(connData, 404, "Failed to reboot the MCU");
   }
-  optibootInit();return HTTPD_CGI_DONE;
+  optibootInit();
+  return HTTPD_CGI_DONE;
 }
 
 /*
@@ -1177,6 +1310,4 @@ static bool ICACHE_FLASH_ATTR debug() {
   return debug_on;
 }
 
-static void debugOn(bool on) {
-  debug_on = on;
-}
+static void debugOn(bool on) { debug_on = on; }

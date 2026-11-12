@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Real update API guards and bounded inventory on an independently built ESPFS image."""
+
 import _paths
-import json,os,subprocess
+import json, os, subprocess
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'.build-tests/updates';OUT.mkdir(parents=True,exist_ok=True)
-source=r'''
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / ".build-tests/updates"
+OUT.mkdir(parents=True, exist_ok=True)
+source = r"""
 #include <assert.h>
 #include <esp8266.h>
 #define os_strncmp strncmp
@@ -72,17 +76,62 @@ int main(void){
  assert(request(apiPagesInfo,NULL)==404);assert(request(apiPagesClear,"action=remove_all_pages")==404&&!clears);
 #endif
 }
-'''
-(OUT/'test.c').write_text(source)
-for full in [False,True]:
- binary=OUT/('full' if full else 'minimal')
- subprocess.run(['cc','-std=c11','-g','-O1','-fsanitize=address,undefined','-Wall','-Wextra','-Werror','-Wno-misleading-indentation','-Wno-ignored-qualifiers',*(['-DWEBSERVER'] if full else []),*['-I'+str(ROOT/p) for p in ['tests/support/api-stubs','src/core','src/httpd','src/serial','include','build','src/web-server','src/cmd','src/espfs']],str(OUT/'test.c'),str(ROOT/'src/core/api_json.c'),'-o',str(binary)],check=True)
- raw=subprocess.check_output([str(binary)],text=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
- cases={k:json.loads(v) for k,v in (line.split('\t',1) for line in raw.splitlines())}
- assert not cases['firmware']['ota_supported'] and cases['firmware']['reason']=='OTA unvalidated'
- if full:
-  assert not cases['invalid']['valid'] and not cases['outside']['valid']
-  assert cases['empty']['valid'] and cases['empty']['count']==0 and cases['empty']['used_bytes']==16
-  assert cases['one']['valid'] and cases['one']['files']==[{'name':'name"\n.html','bytes':0}]
-  assert cases['past-end']['files']==[]
-print('PASS update API: truthful OTA info, guarded activation/upload, bounded escaped/empty-file inventory, clear and busy guards; full/minimal modules')
+"""
+(OUT / "test.c").write_text(source)
+for full in [False, True]:
+    binary = OUT / ("full" if full else "minimal")
+    subprocess.run(
+        [
+            "cc",
+            "-std=c11",
+            "-g",
+            "-O1",
+            "-fsanitize=address,undefined",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-Wno-misleading-indentation",
+            "-Wno-ignored-qualifiers",
+            *(["-DWEBSERVER"] if full else []),
+            *[
+                "-I" + str(ROOT / p)
+                for p in [
+                    "tests/support/api-stubs",
+                    "src/core",
+                    "src/httpd",
+                    "src/serial",
+                    "include",
+                    "build",
+                    "src/web-server",
+                    "src/cmd",
+                    "src/espfs",
+                ]
+            ],
+            str(OUT / "test.c"),
+            str(ROOT / "src/core/api_json.c"),
+            "-o",
+            str(binary),
+        ],
+        check=True,
+    )
+    raw = subprocess.check_output(
+        [str(binary)], text=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"}
+    )
+    cases = {k: json.loads(v) for k, v in (line.split("\t", 1) for line in raw.splitlines())}
+    assert (
+        not cases["firmware"]["ota_supported"] and cases["firmware"]["reason"] == "OTA unvalidated"
+    )
+    if full:
+        assert not cases["invalid"]["valid"] and not cases["outside"]["valid"]
+        assert (
+            cases["empty"]["valid"]
+            and cases["empty"]["count"] == 0
+            and cases["empty"]["used_bytes"] == 16
+        )
+        assert cases["one"]["valid"] and cases["one"]["files"] == [
+            {"name": 'name"\n.html', "bytes": 0}
+        ]
+        assert cases["past-end"]["files"] == []
+print(
+    "PASS update API: truthful OTA info, guarded activation/upload, bounded escaped/empty-file inventory, clear and busy guards; full/minimal modules"
+)

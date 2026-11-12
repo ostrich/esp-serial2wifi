@@ -1,0 +1,11 @@
+third_party/
+.cache/
+.venv/
+node_modules/
+build/
+firmware/
+dist/
+.build-tests/
+backups/
+web/custom-pages/pure.css
+package-lock.json

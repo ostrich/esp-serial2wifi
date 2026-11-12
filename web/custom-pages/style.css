@@ -1,21 +1,29 @@
 /* All fonts */
-html, button, input, select, textarea, .pure-g [class *= "pure-u"] {
+html,
+button,
+input,
+select,
+textarea,
+.pure-g [class*="pure-u"] {
   font-family: sans-serif;
 }
 
-input[type="text"], input[type="password"], textarea {
+input[type="text"],
+input[type="password"],
+textarea {
   width: 100%;
 }
 
-input[type=checkbox] {
+input[type="checkbox"] {
   float: left;
-  margin: .35em 0.4em;
+  margin: 0.35em 0.4em;
 }
 
 body {
-    color: #777;
+  color: #777;
 }
-a:visited, a:link {
+a:visited,
+a:link {
   color: #009;
 }
 a:hover {
@@ -37,52 +45,72 @@ a:hover {
 .edit-off {
   cursor: pointer;
 }
-.click-to-edit input, .click-to-edit textarea {
+.click-to-edit input,
+.click-to-edit textarea {
   color: black;
   background-color: #eee;
   width: 100%;
 }
-.click-to-edit span, .click-to-edit div {
+.click-to-edit span,
+.click-to-edit div {
   /*background-color: #e0e0e0;*/
   /*color: #1c0099;*/
   padding: 0.3em;
   width: 100%;
   color: #444; /* rgba not supported (IE 8) */
-  color: rgba(0, 0, 0, 0.80); /* rgba supported */
-  border: 1px solid #999;  /*IE 6/7/8*/
-  border: none rgba(0, 0, 0, 0);  /*IE9 + everything else*/
-  background-color: #E6E6E6;
+  color: rgba(0, 0, 0, 0.8); /* rgba supported */
+  border: 1px solid #999; /*IE 6/7/8*/
+  border: none rgba(0, 0, 0, 0); /*IE9 + everything else*/
+  background-color: #e6e6e6;
   text-decoration: none;
   border-radius: 2px;
 }
-.click-to-edit span:hover, .click-to-edit div:hover,
-.click-to-edit span:focus, .click-to-edit div:focus {
-    filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#00000000', endColorstr='#1a000000',GradientType=0);
-    background-image: -webkit-gradient(linear, 0 0, 0 100%, from(transparent), color-stop(40%, rgba(0,0,0, 0.05)), to(rgba(0,0,0, 0.10)));
-    background-image: -webkit-linear-gradient(transparent, rgba(0,0,0, 0.05) 40%, rgba(0,0,0, 0.10));
-    background-image: -moz-linear-gradient(top, rgba(0,0,0, 0.05) 0%, rgba(0,0,0, 0.10));
-    background-image: -o-linear-gradient(transparent, rgba(0,0,0, 0.05) 40%, rgba(0,0,0, 0.10));
-    background-image: linear-gradient(transparent, rgba(0,0,0, 0.05) 40%, rgba(0,0,0, 0.10));
+.click-to-edit span:hover,
+.click-to-edit div:hover,
+.click-to-edit span:focus,
+.click-to-edit div:focus {
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='#00000000', endColorstr='#1a000000',GradientType=0);
+  background-image: -webkit-gradient(
+    linear,
+    0 0,
+    0 100%,
+    from(transparent),
+    color-stop(40%, rgba(0, 0, 0, 0.05)),
+    to(rgba(0, 0, 0, 0.1))
+  );
+  background-image: -webkit-linear-gradient(
+    transparent,
+    rgba(0, 0, 0, 0.05) 40%,
+    rgba(0, 0, 0, 0.1)
+  );
+  background-image: -moz-linear-gradient(top, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.1));
+  background-image: -o-linear-gradient(transparent, rgba(0, 0, 0, 0.05) 40%, rgba(0, 0, 0, 0.1));
+  background-image: linear-gradient(transparent, rgba(0, 0, 0, 0.05) 40%, rgba(0, 0, 0, 0.1));
 }
-.click-to-edit span:focus, .click-to-edit div:focus {
-    outline: 0;
+.click-to-edit span:focus,
+.click-to-edit div:focus {
+  outline: 0;
 }
-.click-to-edit span:active, .click-to-edit div:active {
-    box-shadow: 0 0 0 1px rgba(0,0,0, 0.15) inset, 0 0 6px rgba(0,0,0, 0.20) inset;
-    border-color: #000\9;
+.click-to-edit span:active,
+.click-to-edit div:active {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.15) inset,
+    0 0 6px rgba(0, 0, 0, 0.2) inset;
+  border-color: #000\9;
 }
 /* Firefox: Get rid of the inner focus border */
 .click-to-edit span::-moz-focus-inner,
 .click-to-edit div::-moz-focus-inner {
-    padding: 0;
-    border: 0;
+  padding: 0;
+  border: 0;
 }
 
 /* pop-ups */
 .popup-hidden {
   display: none;
 }
-.popup, div.popup {
+.popup,
+div.popup {
   position: absolute;
   /*top: 100%;*/
   bottom: 125%;
@@ -132,28 +160,31 @@ fieldset fields {
   width: 90%;
 }
 
-.pure-table td, .pure-table th {
+.pure-table td,
+.pure-table th {
   padding: 0.5em 0.5em;
 }
 
 /* Narrow left-aligned Forms */
 .pure-form-aligned.form-narrow .pure-control-group label {
-    text-align: left;
-    width: 6em;
+  text-align: left;
+  width: 6em;
 }
-.pure-form-aligned.form-narrow input[type=checkbox],
-.pure-form-aligned.form-narrow input[type=radio] {
+.pure-form-aligned.form-narrow input[type="checkbox"],
+.pure-form-aligned.form-narrow input[type="radio"] {
   float: none;
 }
 
 /* make images size-up */
 .xx-pure-img-responsive {
-    max-width: 100%;
-    height: auto;
+  max-width: 100%;
+  height: auto;
 }
 
 /* Add transition to containers so they can push in and out  */
-#layout, #menu, .menu-link {
+#layout,
+#menu,
+.menu-link {
   -webkit-transition: all 0.2s ease-out;
   transition: all 0.2s ease-out;
 }
@@ -243,7 +274,7 @@ select.pure-button {
 }
 
 input.inline {
-  float:none;
+  float: none;
   margin-right: 0px;
   margin-left: 0.5em;
 }
@@ -280,7 +311,8 @@ pre.console a {
 
 /* console flex */
 
-.flex-hbox, .flex-vbox {
+.flex-hbox,
+.flex-vbox {
   display: -webkit-box;
   display: flex;
   display: -ms-flexbox;
@@ -290,8 +322,8 @@ pre.console a {
   -webkit-box-orient: horizontal;
   -webkit-box-direction: normal;
   -webkit-flex-direction: row;
-      -ms-flex-direction: row;
-          flex-direction: row;
+  -ms-flex-direction: row;
+  flex-direction: row;
   ms-flex-direction: row;
   webkit-flex-direction: row;
 }
@@ -299,8 +331,8 @@ pre.console a {
   -webkit-box-orient: vertical;
   -webkit-box-direction: normal;
   -webkit-flex-direction: column;
-      -ms-flex-direction: column;
-          flex-direction: column;
+  -ms-flex-direction: column;
+  flex-direction: column;
   ms-flex-direction: column;
   webkit-flex-direction: column;
   /*width: 100%; */
@@ -308,8 +340,8 @@ pre.console a {
 .flex-fill {
   -webkit-box-flex: 1;
   -webkit-flex: 1 1 auto;
-      -ms-flex: 1 1 auto;
-          flex: 1 1 auto;
+  -ms-flex: 1 1 auto;
+  flex: 1 1 auto;
   ms-flex: 1 1 auto;
   webkit-flex: 1 1 auto;
 }
@@ -319,7 +351,8 @@ pre.console a {
 }
 
 /* log page */
-.dbg-btn, #refresh-button {
+.dbg-btn,
+#refresh-button {
   vertical-align: baseline;
 }
 
@@ -350,20 +383,24 @@ pre.console a {
   padding: 0.6em 0 0.6em 0.6em;
 }
 
-#menu .pure-menu, #menu .pure-menu ul {
+#menu .pure-menu,
+#menu .pure-menu ul {
   border: none;
   background: transparent;
 }
 
-#menu .pure-menu ul, #menu .pure-menu .menu-item-divided {
+#menu .pure-menu ul,
+#menu .pure-menu .menu-item-divided {
   border-top: 1px solid #333;
 }
 
-#menu .pure-menu li a:hover, #menu .pure-menu li a:focus {
+#menu .pure-menu li a:hover,
+#menu .pure-menu li a:focus {
   background: #333;
 }
 
-#menu .pure-menu-selected, #menu .pure-menu-heading {
+#menu .pure-menu-selected,
+#menu .pure-menu-heading {
   background: #9d1414;
 }
 
@@ -385,7 +422,7 @@ pre.console a {
 }
 
 #menu .pure-menu-item {
-  height:2em;
+  height: 2em;
 }
 
 /* -- Dynamic Button For Responsive Menu -------------------------------------*/
@@ -396,7 +433,7 @@ pre.console a {
   top: 0;
   left: 0;
   background: #000;
-  background: rgba(0,0,0,0.7);
+  background: rgba(0, 0, 0, 0.7);
   font-size: 10px;
   z-index: 10;
   width: 2em;
@@ -404,7 +441,8 @@ pre.console a {
   padding: 2.1em 1.6em;
 }
 
-.menu-link:hover, .menu-link:focus {
+.menu-link:hover,
+.menu-link:focus {
   background: #000;
 }
 
@@ -413,13 +451,16 @@ pre.console a {
   display: block;
 }
 
-.menu-link span, .menu-link span:before, .menu-link span:after {
+.menu-link span,
+.menu-link span:before,
+.menu-link span:after {
   background-color: #fff;
   width: 100%;
   height: 0.2em;
 }
 
-.menu-link span:before, .menu-link span:after {
+.menu-link span:before,
+.menu-link span:after {
   position: absolute;
   margin-top: -0.6em;
   content: " ";
@@ -432,7 +473,8 @@ pre.console a {
 /* -- Responsive Styles (Media Queries) ------------------------------------- */
 
 @media (min-width: 56em) {
-  .header, .content {
+  .header,
+  .content {
     padding-left: 2em;
     padding-right: 2em;
   }

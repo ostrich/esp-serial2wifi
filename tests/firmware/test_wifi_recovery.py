@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 """Actual failed-association radio recovery, including asynchronous cancellation."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
-import subprocess,os
-ROOT=Path(__file__).resolve().parents[2];BUILD=ROOT/'.build-tests/wifi-recovery';BUILD.mkdir(parents=True,exist_ok=True)
-cgi=(ROOT/'src/core/cgiwifi.c').read_text()
-recovery=cgi[cgi.index('static void ICACHE_FLASH_ATTR resetTimerCb('):cgi.index('// Reassociate timer to delay change')]
-timeout_event=cgi[cgi.index('  case EVENT_STAMODE_DHCP_TIMEOUT:')+len('  case EVENT_STAMODE_DHCP_TIMEOUT:'):cgi.index('  case EVENT_STAMODE_AUTHMODE_CHANGE:')].replace('    break;','')
-source=r'''
+import subprocess, os
+
+ROOT = Path(__file__).resolve().parents[2]
+BUILD = ROOT / ".build-tests/wifi-recovery"
+BUILD.mkdir(parents=True, exist_ok=True)
+cgi = SourceText((ROOT / "src/core/cgiwifi.c").read_text())
+recovery = cgi[
+    cgi.index("static void ICACHE_FLASH_ATTR resetTimerCb(") : cgi.index(
+        "// Reassociate timer to delay change"
+    )
+]
+timeout_event = cgi[
+    cgi.index("  case EVENT_STAMODE_DHCP_TIMEOUT:")
+    + len("  case EVENT_STAMODE_DHCP_TIMEOUT:") : cgi.index("  case EVENT_STAMODE_AUTHMODE_CHANGE:")
+].replace("    break;", "")
+source = (
+    r"""
 #include <assert.h>
 #include "wifi_recovery.c"
 #define DBG(...) ((void)0)
@@ -34,7 +47,12 @@ void os_timer_disarm(ETSTimer *v){v->armed=false;}
 void os_timer_setfn(ETSTimer *v,void (*cb)(void *),void *arg){v->callback=cb;v->arg=arg;}
 void os_timer_arm(ETSTimer *v,unsigned ms,bool repeat){assert(!repeat);if(v==&resetTimer)resetArms++;v->ms=ms;v->armed=true;}
 static void fire(void){assert(channelTimer.armed);channelTimer.armed=false;channelTimer.callback(channelTimer.arg);}
-''' + recovery + '\nstatic void timeoutEvent(void){'+timeout_event+'}\n' + r'''
+"""
+    + recovery
+    + "\nstatic void timeoutEvent(void){"
+    + timeout_event
+    + "}\n"
+    + r"""
 int main(void){
  assert(wifiRecoveryBegin()&&!policy&&!wifiRecoveryStatus());
  assert(!wifiRecoveryPoll(STATION_CONNECTING)&&!disconnects);
@@ -68,8 +86,29 @@ int main(void){
  state=STATION_NO_AP_FOUND;scheduleRecovery();resetTimerCb(NULL);assert(mode==3&&wifiRecoveryStatus()==STATION_NO_AP_FOUND);fire();
  puts("PASS actual Wi-Fi recovery: stop terminal-failure retries, retain failure telemetry, defer channel restore, bounded failures, cancel on IP and explicit retry");
 }
-'''
-(BUILD/'test.c').write_text(source)
-subprocess.run(['cc','-std=c11','-g','-O1','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-DCHANGE_TO_STA','-fsanitize=address,undefined',
- '-I'+str(ROOT/'tests/support/api-stubs'),'-I'+str(ROOT/'src/core'),str(BUILD/'test.c'),'-o',str(BUILD/'test')],check=True)
-subprocess.run([str(BUILD/'test')],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
+"""
+)
+(BUILD / "test.c").write_text(source)
+subprocess.run(
+    [
+        "cc",
+        "-std=c11",
+        "-g",
+        "-O1",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-unused-parameter",
+        "-DCHANGE_TO_STA",
+        "-fsanitize=address,undefined",
+        "-I" + str(ROOT / "tests/support/api-stubs"),
+        "-I" + str(ROOT / "src/core"),
+        str(BUILD / "test.c"),
+        "-o",
+        str(BUILD / "test"),
+    ],
+    check=True,
+)
+subprocess.run(
+    [str(BUILD / "test")], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"}
+)

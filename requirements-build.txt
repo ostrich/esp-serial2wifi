@@ -2,3 +2,5 @@
 zopfli==0.4.3
 
 -r requirements-flash.txt
+
+-r requirements-format.txt

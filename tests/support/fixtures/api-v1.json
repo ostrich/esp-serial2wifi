@@ -16,10 +16,7 @@
       "max_ota_image_bytes": 0,
       "flash_slot_bytes": 503808
     },
-    "serial_tcp_ports": [
-      23,
-      2323
-    ]
+    "serial_tcp_ports": [23, 2323]
   },
   "/api/v1/status": {
     "schema": 1,
@@ -122,10 +119,7 @@
     "parity": "N",
     "stop_bits": "1",
     "clients": 0,
-    "ports": [
-      23,
-      2323
-    ],
+    "ports": [23, 2323],
     "programming": false,
     "queued_bytes": 0,
     "cancelled_bytes": 0,

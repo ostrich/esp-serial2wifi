@@ -4,7 +4,7 @@
 #include "httpd.h"
 
 enum { wifiIsDisconnected, wifiIsConnected, wifiGotIP };
-typedef void(*WifiStateChangeCb)(uint8_t wifiStatus);
+typedef void (*WifiStateChangeCb)(uint8_t wifiStatus);
 
 void configWifiIP();
 void wifiInit(void);

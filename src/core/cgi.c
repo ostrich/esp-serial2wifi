@@ -22,9 +22,14 @@ Some random cgi routines.
 #endif
 
 #ifdef CGI_DBG
-#define DBG(format, ...) do { os_printf(format, ## __VA_ARGS__); } while(0)
+#define DBG(format, ...)                                                                           \
+  do {                                                                                             \
+    os_printf(format, ##__VA_ARGS__);                                                              \
+  } while (0)
 #else
-#define DBG(format, ...) do { } while(0)
+#define DBG(format, ...)                                                                           \
+  do {                                                                                             \
+  } while (0)
 #endif
 
 void ICACHE_FLASH_ATTR noCacheHeaders(HttpdConnData *connData, int code) {
@@ -47,11 +52,11 @@ void ICACHE_FLASH_ATTR errorResponse(HttpdConnData *connData, int code, char *me
   DBG("HTTP %d error response: \"%s\"\n", code, message);
 }
 
-uint8_t ICACHE_FLASH_ATTR UTILS_StrToIP(const char* str, void *ip){
+uint8_t ICACHE_FLASH_ATTR UTILS_StrToIP(const char *str, void *ip) {
   /* The count of the number of bytes processed. */
   int i;
   /* A pointer to the next digit to process. */
-  const char * start;
+  const char *start;
 
   start = str;
   for (i = 0; i < 4; i++) {
@@ -71,36 +76,40 @@ uint8_t ICACHE_FLASH_ATTR UTILS_StrToIP(const char* str, void *ip){
       the end of the numbers, we will allow any character. */
       else if ((i < 3 && c == '.') || i == 3) {
         break;
-      }
-      else {
+      } else {
         return 0;
       }
     }
     if (n >= 256) {
       return 0;
     }
-    ((uint8_t*)ip)[i] = n;
+    ((uint8_t *)ip)[i] = n;
   }
   return 1;
 }
 
-
-
 extern char *firmwareVersion; // in main.c
 
-static void ICACHE_FLASH_ATTR pageMenu(ApiJson *j,const void *unused) {
+static void ICACHE_FLASH_ATTR pageMenu(ApiJson *j, const void *unused) {
   (void)unused;
-  apiJsonLiteral(j,"{\"menu\":[\"Dashboard\",\"/\",\"Network\",\"/index.html#/network\",\"Serial & MCU\",\"/index.html#/serial\",\"Device Settings\",\"/index.html#/settings\",\"Diagnostics\",\"/index.html#/diagnostics\",\"Firmware\",\"/index.html#/firmware\"");
+  apiJsonLiteral(
+      j,
+      "{\"menu\":[\"Dashboard\",\"/\",\"Network\",\"/index.html#/network\",\"Serial & MCU\",\"/index.html#/serial\",\"Device Settings\",\"/index.html#/settings\",\"Diagnostics\",\"/index.html#/diagnostics\",\"Firmware\",\"/index.html#/firmware\"");
 #if defined(MQTT) || defined(REST) || defined(SOCKET)
-  apiJsonLiteral(j,",\"Integrations\",\"/index.html#/integrations\"");
+  apiJsonLiteral(j, ",\"Integrations\",\"/index.html#/integrations\"");
 #endif
 #ifdef WEBSERVER
-  apiJsonLiteral(j,",\"Custom Pages\",\"/index.html#/pages\"");apiJsonRaw(j,WEB_UserPages());
+  apiJsonLiteral(j, ",\"Custom Pages\",\"/index.html#/pages\"");
+  apiJsonRaw(j, WEB_UserPages());
 #endif
-  apiJsonLiteral(j,"],\"version\":");apiJsonString(j,firmwareVersion,96);
-  apiJsonLiteral(j,",\"name\":");apiJsonString(j,flashConfig.hostname,sizeof flashConfig.hostname);apiJsonLiteral(j,"}");
+  apiJsonLiteral(j, "],\"version\":");
+  apiJsonString(j, firmwareVersion, 96);
+  apiJsonLiteral(j, ",\"name\":");
+  apiJsonString(j, flashConfig.hostname, sizeof flashConfig.hostname);
+  apiJsonLiteral(j, "}");
 }
 int ICACHE_FLASH_ATTR cgiMenu(HttpdConnData *connData) {
-  if(!connData->conn)return HTTPD_CGI_DONE;
-  return apiResponse(connData,200,pageMenu,NULL);
+  if (!connData->conn)
+    return HTTPD_CGI_DONE;
+  return apiResponse(connData, 200, pageMenu, NULL);
 }

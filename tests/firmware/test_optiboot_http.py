@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Compile complete Optiboot HTTP handlers, parser and wire producer with faults."""
+
 import _paths
 from pathlib import Path
-import os,subprocess
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'.build-tests/optiboot-http';OUT.mkdir(parents=True,exist_ok=True)
-(OUT/'osapi.h').write_text('#pragma once\n')
-source=r'''
+import os, subprocess
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / ".build-tests/optiboot-http"
+OUT.mkdir(parents=True, exist_ok=True)
+(OUT / "osapi.h").write_text("#pragma once\n")
+source = r"""
 #include <assert.h>
 #include <esp8266.h>
 #define os_strcpy strcpy
@@ -106,8 +110,41 @@ int main(void){
  for(int cap=1;cap<=16;cap++){char guarded[20];memset(guarded,0xa5,sizeof guarded);guarded[0]=0;appendPretty(guarded,cap,raw,sizeof raw);assert((unsigned char)guarded[cap]==0xa5);}
  optibootInit();puts("PASS complete Optiboot HTTP: guarded readback sync, raw file/result/wire bytes, legacy mode, every allocation failure, upload ownership/abort, malformed records/trailing data and bounded diagnostics");
 }
-'''
-(OUT/'test.c').write_text(source)
-subprocess.run(['cc','-std=c11','-g','-O1','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-Wno-unused-variable','-Wno-ignored-qualifiers','-Wno-misleading-indentation','-funsigned-char','-fsanitize=address,undefined',
- *['-I'+str(p) for p in [OUT,ROOT/'tests/support/api-stubs',ROOT/'src/core',ROOT/'src/httpd',ROOT/'src/serial',ROOT/'include']],str(OUT/'test.c'),str(ROOT/'src/core/api_json.c'),'-o',str(OUT/'test')],check=True)
-subprocess.run([str(OUT/'test')],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
+"""
+(OUT / "test.c").write_text(source)
+subprocess.run(
+    [
+        "cc",
+        "-std=c11",
+        "-g",
+        "-O1",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-unused-parameter",
+        "-Wno-unused-variable",
+        "-Wno-ignored-qualifiers",
+        "-Wno-misleading-indentation",
+        "-funsigned-char",
+        "-fsanitize=address,undefined",
+        *[
+            "-I" + str(p)
+            for p in [
+                OUT,
+                ROOT / "tests/support/api-stubs",
+                ROOT / "src/core",
+                ROOT / "src/httpd",
+                ROOT / "src/serial",
+                ROOT / "include",
+            ]
+        ],
+        str(OUT / "test.c"),
+        str(ROOT / "src/core/api_json.c"),
+        "-o",
+        str(OUT / "test"),
+    ],
+    check=True,
+)
+subprocess.run(
+    [str(OUT / "test")], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"}
+)

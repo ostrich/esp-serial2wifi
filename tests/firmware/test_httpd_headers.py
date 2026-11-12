@@ -1,16 +1,34 @@
 #!/usr/bin/env python3
 """Actual HTTP header/receive code: case folding and bounded request framing."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
 import subprocess
 
 root = Path(__file__).resolve().parents[2]
-source = (root / 'src/httpd/httpd.c').read_text()
-lookup = source[source.index('static bool ICACHE_FLASH_ATTR httpdHeaderName('):source.index('//Setup an output buffer')]
-append = source[source.index('static bool ICACHE_FLASH_ATTR httpdAppendHeader('):source.index('//Stupid li\'l helper')]
-parse = source[source.index('static void ICACHE_FLASH_ATTR httpdRejectHeader('):source.index('//Callback called when there\'s data')]
-receive = source[source.index('static void ICACHE_FLASH_ATTR httpdRecvCb('):source.index('static void ICACHE_FLASH_ATTR httpdDisconCb(')]
-prefix = r'''
+source = SourceText((root / "src/httpd/httpd.c").read_text())
+lookup = source[
+    source.index("static bool ICACHE_FLASH_ATTR httpdHeaderName(") : source.index(
+        "//Setup an output buffer"
+    )
+]
+append = source[
+    source.index("static bool ICACHE_FLASH_ATTR httpdAppendHeader(") : source.index(
+        "//Stupid li'l helper"
+    )
+]
+parse = source[
+    source.index("static void ICACHE_FLASH_ATTR httpdRejectHeader(") : source.index(
+        "//Callback called when there's data"
+    )
+]
+receive = source[
+    source.index("static void ICACHE_FLASH_ATTR httpdRecvCb(") : source.index(
+        "static void ICACHE_FLASH_ATTR httpdDisconCb("
+    )
+]
+prefix = r"""
 #include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -42,8 +60,8 @@ static void httpdProcessRequest(HttpdConnData *c){
  consumed[consumed_length]=0;
  if(c->post->received==c->post->len&&!keep_response_open)c->post->len=0;
 }
-'''
-tests = r'''
+"""
+tests = r"""
 static Priv priv;static Post post;static struct espconn socket;
 static char header[1025];static HttpdConnData connection={.priv=&priv,.post=&post,.conn=&socket};
 static void reset(void){
@@ -89,11 +107,24 @@ int main(void){
  reset();assert(!allocations);
  puts("PASS actual HTTP header/receive: case-insensitive names, OWS, empty/bounded lookup, fragmented and streaming bodies; negative/overflow/duplicate/chunked framing and OOM fail closed");
 }
-'''
-build = root / '.build-tests'
+"""
+build = root / ".build-tests"
 build.mkdir(exist_ok=True)
-path = build / 'test-httpd-headers.c'
+path = build / "test-httpd-headers.c"
 path.write_text(prefix + lookup + append + parse + receive + tests)
-binary = path.with_suffix('')
-subprocess.run(['gcc', '-std=c99', '-Wall', '-Wextra', '-Werror', '-fsanitize=address,undefined', str(path), '-o', str(binary)], check=True)
+binary = path.with_suffix("")
+subprocess.run(
+    [
+        "gcc",
+        "-std=c99",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fsanitize=address,undefined",
+        str(path),
+        "-o",
+        str(binary),
+    ],
+    check=True,
+)
 subprocess.run([str(binary)], check=True)

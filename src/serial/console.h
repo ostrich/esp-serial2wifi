@@ -10,7 +10,8 @@ typedef struct {
   const char *reason;
   const void *stream; // live FIFO snapshot; NULL for the rolling capture
 } ConsoleCapture;
-void consoleCapture(ConsoleCapture *, bool supplied, uint32_t boot, uint32_t epoch, uint32_t cursor);
+void consoleCapture(ConsoleCapture *, bool supplied, uint32_t boot, uint32_t epoch,
+                    uint32_t cursor);
 uint8_t consoleCaptureByte(const ConsoleCapture *, unsigned index);
 void consoleCaptureClear(void);
 // One live consumer, starting at the current UART tail. Payload blocks are

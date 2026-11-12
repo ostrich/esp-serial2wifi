@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Actual multipart parser: exact binary files, arbitrary splits and incomplete requests."""
+
 import _paths
-import os,subprocess
+import os, subprocess
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'.build-tests/multipart';OUT.mkdir(parents=True,exist_ok=True)
-source=r'''
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / ".build-tests/multipart"
+OUT.mkdir(parents=True, exist_ok=True)
+source = r"""
 #include <assert.h>
 #include <esp8266.h>
 #define os_malloc malloc
@@ -49,7 +53,27 @@ int main(void){
  wantFiles=2;run(17,total,true);assert(!memcmp(result+sizeof payload,payload,sizeof payload));
  puts("PASS multipart: exact binary payload, split delimiters, prefix lookalikes and incomplete body refusal");
 }
-'''
-(OUT/'test.c').write_text(source)
-subprocess.run(['cc','-std=c11','-g','-O1','-fsanitize=address,undefined','-Wall','-Wextra','-Werror','-Wno-misleading-indentation','-Wno-ignored-qualifiers',*['-I'+str(ROOT/p) for p in ['tests/support/api-stubs','src/httpd','src/core']],str(OUT/'test.c'),'-o',str(OUT/'test')],check=True)
-subprocess.run([str(OUT/'test')],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
+"""
+(OUT / "test.c").write_text(source)
+subprocess.run(
+    [
+        "cc",
+        "-std=c11",
+        "-g",
+        "-O1",
+        "-fsanitize=address,undefined",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-misleading-indentation",
+        "-Wno-ignored-qualifiers",
+        *["-I" + str(ROOT / p) for p in ["tests/support/api-stubs", "src/httpd", "src/core"]],
+        str(OUT / "test.c"),
+        "-o",
+        str(OUT / "test"),
+    ],
+    check=True,
+)
+subprocess.run(
+    [str(OUT / "test")], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"}
+)

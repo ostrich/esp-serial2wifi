@@ -8,9 +8,14 @@
 #include "cmd.h"
 
 #ifdef SLIP_DBG
-#define DBG(format, ...) do { os_printf(format, ## __VA_ARGS__); } while(0)
+#define DBG(format, ...)                                                                           \
+  do {                                                                                             \
+    os_printf(format, ##__VA_ARGS__);                                                              \
+  } while (0)
 #else
-#define DBG(format, ...) do { } while(0)
+#define DBG(format, ...)                                                                           \
+  do {                                                                                             \
+  } while (0)
 #endif
 
 extern void ICACHE_FLASH_ATTR console_process(char *buf, short len);
@@ -33,19 +38,18 @@ static char slip_buf[SLIP_MAX]; // buffer for current SLIP packet
 static short slip_len;          // accumulated length in slip_buf
 
 // SLIP process a packet or a bunch of debug console chars
-static void ICACHE_FLASH_ATTR
-slip_process() {
+static void ICACHE_FLASH_ATTR slip_process() {
   if (slip_len > 2) {
     // proper SLIP packet, invoke command processor after checking CRC
     //os_printf("SLIP: rcv %d\n", slip_len);
-    uint16_t crc = crc16_data((uint8_t*)slip_buf, slip_len-2, 0);
-    uint16_t rcv = ((uint16_t)slip_buf[slip_len-2]) | ((uint16_t)slip_buf[slip_len-1] << 8);
+    uint16_t crc = crc16_data((uint8_t *)slip_buf, slip_len - 2, 0);
+    uint16_t rcv = ((uint16_t)slip_buf[slip_len - 2]) | ((uint16_t)slip_buf[slip_len - 1] << 8);
     if (crc == rcv) {
-      cmdParsePacket((uint8_t*)slip_buf, slip_len-2);
+      cmdParsePacket((uint8_t *)slip_buf, slip_len - 2);
     } else {
       os_printf("SLIP: bad CRC, crc=%04x rcv=%04x len=%d\n", crc, rcv, slip_len);
 
-      for (short i=0; i<slip_len; i++) {
+      for (short i = 0; i < slip_len; i++) {
         if (slip_buf[i] >= ' ' && slip_buf[i] <= '~') {
           DBG("%c", slip_buf[i]);
         } else {
@@ -58,13 +62,11 @@ slip_process() {
 }
 
 // determine whether a character is printable or not (or \r \n)
-static bool ICACHE_FLASH_ATTR
-slip_printable(char c) {
+static bool ICACHE_FLASH_ATTR slip_printable(char c) {
   return (c >= ' ' && c <= '~') || c == '\n' || c == '\r';
 }
 
-static void ICACHE_FLASH_ATTR
-slip_reset() {
+static void ICACHE_FLASH_ATTR slip_reset() {
   //os_printf("SLIP: reset\n");
   slip_inpkt = true;
   slip_escaped = false;
@@ -72,21 +74,25 @@ slip_reset() {
 }
 
 // SLIP parse a single character
-static void ICACHE_FLASH_ATTR
-slip_parse_char(char c) {
+static void ICACHE_FLASH_ATTR slip_parse_char(char c) {
   if (c == SLIP_END) {
     // either start or end of packet, process whatever we may have accumulated
     DBG("SLIP: start or end len=%d inpkt=%d\n", slip_len, slip_inpkt);
     if (slip_len > 0) {
-      if (slip_len > 2 && slip_inpkt) slip_process();
-      else console_process(slip_buf, slip_len);
+      if (slip_len > 2 && slip_inpkt)
+        slip_process();
+      else
+        console_process(slip_buf, slip_len);
     }
     slip_reset();
   } else if (slip_escaped) {
     // prev char was SLIP_ESC
-    if (c == SLIP_ESC_END) c = SLIP_END;
-    if (c == SLIP_ESC_ESC) c = SLIP_ESC;
-    if (slip_len < SLIP_MAX) slip_buf[slip_len++] = c;
+    if (c == SLIP_ESC_END)
+      c = SLIP_END;
+    if (c == SLIP_ESC_ESC)
+      c = SLIP_ESC;
+    if (slip_len < SLIP_MAX)
+      slip_buf[slip_len++] = c;
     slip_escaped = false;
   } else if (slip_inpkt && c == SLIP_ESC) {
     slip_escaped = true;
@@ -95,15 +101,15 @@ slip_parse_char(char c) {
       // start of packet and it's a printable character, we're gonna assume that this is console text
       slip_inpkt = false;
     }
-    if (slip_len < SLIP_MAX) slip_buf[slip_len++] = c;
+    if (slip_len < SLIP_MAX)
+      slip_buf[slip_len++] = c;
   }
 }
 
 // callback with a buffer of characters that have arrived on the uart
-void ICACHE_FLASH_ATTR
-slip_parse_buf(char *buf, short length) {
+void ICACHE_FLASH_ATTR slip_parse_buf(char *buf, short length) {
   // do SLIP parsing
-  for (short i=0; i<length; i++)
+  for (short i = 0; i < length; i++)
     slip_parse_char(buf[i]);
 
   // if we're in-between packets (debug console) then print it now

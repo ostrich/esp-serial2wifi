@@ -9,3 +9,4 @@ node_modules/
 /config.mk
 __pycache__/
 *.pyc
+/.ruff_cache/

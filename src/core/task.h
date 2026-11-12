@@ -8,13 +8,13 @@
  *
  */
 
-#ifndef	USRTASK_H
+#ifndef USRTASK_H
 #define USRTASK_H
 
-#define _taskPrio        1
-#define _task_queueLen   8
+#define _taskPrio 1
+#define _task_queueLen 8
 
-uint8_t register_usr_task (os_task_t event);
-bool	post_usr_task(uint8_t task, os_param_t par);
+uint8_t register_usr_task(os_task_t event);
+bool post_usr_task(uint8_t task, os_param_t par);
 
 #endif

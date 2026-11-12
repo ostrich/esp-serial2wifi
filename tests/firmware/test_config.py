@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Run actual config.c against synthetic flash; never use real credentials."""
+
 import _paths
 import json
 import pathlib
@@ -12,7 +13,7 @@ def main():
     source = ROOT
     out = ROOT / ".build-tests/config" / source.name
     out.mkdir(parents=True, exist_ok=True)
-    (out / "esp8266.h").write_text(r'''
+    (out / "esp8266.h").write_text(r"""
 #pragma once
 #include <stdbool.h>
 #include <stdint.h>
@@ -64,9 +65,17 @@ static int spi_flash_erase_sector(uint32_t s) {
  assert(s*4096+4096<=sizeof flash); if(fault())return 1;
  memset(flash+s*4096,255,4096); return 0;
 }
-''')
-    subprocess.run(["python3", str(source / "tools/lib/flash_layout.py"), "4MB",
-                    "--header", str(out / "generated_flash_layout.h")], check=True)
+""")
+    subprocess.run(
+        [
+            "python3",
+            str(source / "tools/lib/flash_layout.py"),
+            "4MB",
+            "--header",
+            str(out / "generated_flash_layout.h"),
+        ],
+        check=True,
+    )
     with (out / "esp8266.h").open("a") as stub:
         stub.write(r"""
 #define SPI_FLASH_SEC_SIZE 4096
@@ -78,9 +87,13 @@ static bool system_partition_table_regist(const partition_item_t *p,uint32_t n,u
  (void)p;(void)n;return map==4;
 }
 """)
-    includes = '\n'.join('#include ' + json.dumps(str(source / p))
-                         for p in ('src/serial/crc16.c','src/core/flash_layout.c','src/core/config.c'))
-    code = includes + r'''
+    includes = "\n".join(
+        "#include " + json.dumps(str(source / p))
+        for p in ("src/serial/crc16.c", "src/core/flash_layout.c", "src/core/config.c")
+    )
+    code = (
+        includes
+        + r"""
 static void fixture(const char *user,const char *password) {
  memset(flash,255,sizeof flash); FlashFull f={0}; f.fc=flashDefault;
  f.fc.seq=10; f.fc.magic=FLASH_MAGIC;
@@ -152,16 +165,33 @@ int main(void) {
  puts("PASS UART register encoding, all 36 persisted formats including five-bit and Odd");
  puts("PASS current credentials and failed-write boundaries preserve a valid configuration");
 }
-'''
+"""
+    )
     (out / "test.c").write_text(code)
-    for chip in (False,True):
-     subprocess.run(['gcc', '-std=c99', '-Wall', '-Wextra', '-Wno-unused-function',
-                    '-Wno-ignored-qualifiers', '-fsanitize=address,undefined',
-                    '-I' + str(out), '-I' + str(source/'src/core'),
-                    '-I' + str(source/'src/espfs'), '-I' + str(source / 'include'), '-I' + str(source/'src/serial'),
-                    *(['-DCHIP_IN_HOSTNAME'] if chip else []),str(out / 'test.c'), '-o', str(out / 'test')], check=True)
-     subprocess.run([str(out / 'test')], check=True)
+    for chip in (False, True):
+        subprocess.run(
+            [
+                "gcc",
+                "-std=c99",
+                "-Wall",
+                "-Wextra",
+                "-Wno-unused-function",
+                "-Wno-ignored-qualifiers",
+                "-fsanitize=address,undefined",
+                "-I" + str(out),
+                "-I" + str(source / "src/core"),
+                "-I" + str(source / "src/espfs"),
+                "-I" + str(source / "include"),
+                "-I" + str(source / "src/serial"),
+                *(["-DCHIP_IN_HOSTNAME"] if chip else []),
+                str(out / "test.c"),
+                "-o",
+                str(out / "test"),
+            ],
+            check=True,
+        )
+        subprocess.run([str(out / "test")], check=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

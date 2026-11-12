@@ -1,20 +1,47 @@
 #!/usr/bin/env python3
 """Actual HTTP connection/flush code must survive reuse of callback stack data."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
 import subprocess
+
 root = Path(__file__).resolve().parents[2]
-s = (root/'src/httpd/httpd.c').read_text()
-connect = s[s.index('static void ICACHE_FLASH_ATTR httpdConnectCb('):s.index('//Httpd initialization routine.')]
-release = s[s.index('static void ICACHE_FLASH_ATTR httpdReleaseSend('):s.index('static void ICACHE_FLASH_ATTR httpdRetireConn(')]
-flush = s[s.index('void ICACHE_FLASH_ATTR httpdFlush('):s.index('// Cooperative HTTP read scheduling')]
-fileSource=(root/'src/httpd/httpdespfs.c').read_text()
-fileCgi=fileSource[fileSource.index('int ICACHE_FLASH_ATTR'):fileSource.index('#if 0')]
-work=s[s.index('// Cooperative HTTP read scheduling'):s.index('//Callback called when the data on a socket has been successfully sent.')]
-sent=s[s.index('static void ICACHE_FLASH_ATTR httpdSentCb('):s.index('static const char *httpNotFoundHeader')]
-process=s[s.index('static const char *httpNotFoundHeader'):s.index('//Parse a line of header data')]
-retire = s[s.index('static void ICACHE_FLASH_ATTR httpdRetireConn('):s.index('//Stupid li',s.index('static void ICACHE_FLASH_ATTR httpdRetireConn('))]
-prelude = r'''
+s = SourceText((root / "src/httpd/httpd.c").read_text())
+connect = s[
+    s.index("static void ICACHE_FLASH_ATTR httpdConnectCb(") : s.index(
+        "//Httpd initialization routine."
+    )
+]
+release = s[
+    s.index("static void ICACHE_FLASH_ATTR httpdReleaseSend(") : s.index(
+        "static void ICACHE_FLASH_ATTR httpdRetireConn("
+    )
+]
+flush = s[
+    s.index("void ICACHE_FLASH_ATTR httpdFlush(") : s.index("// Cooperative HTTP read scheduling")
+]
+fileSource = SourceText((root / "src/httpd/httpdespfs.c").read_text())
+fileCgi = fileSource[fileSource.index("int ICACHE_FLASH_ATTR") : fileSource.index("#if 0")]
+work = s[
+    s.index("// Cooperative HTTP read scheduling") : s.index(
+        "//Callback called when the data on a socket has been successfully sent."
+    )
+]
+sent = s[
+    s.index("static void ICACHE_FLASH_ATTR httpdSentCb(") : s.index(
+        "static const char *httpNotFoundHeader"
+    )
+]
+process = s[
+    s.index("static const char *httpNotFoundHeader") : s.index("//Parse a line of header data")
+]
+retire = s[
+    s.index("static void ICACHE_FLASH_ATTR httpdRetireConn(") : s.index(
+        "//Stupid li", s.index("static void ICACHE_FLASH_ATTR httpdRetireConn(")
+    )
+]
+prelude = r"""
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -87,9 +114,12 @@ static const uint8_t *pending;static unsigned pending_len,reject_send;
 static sint8 espconn_sent(struct espconn *c,uint8_t *p,unsigned n){
  (void)c;pending_len=n;pending=p;return reject_send?-1:0;
 }
-'''
-prelude=prelude.replace('#define MAX_URL_LEN 255',next(line for line in fileSource.splitlines() if line.startswith('#define MAX_URL_LEN ')))
-fsPrelude=r'''
+"""
+prelude = prelude.replace(
+    "#define MAX_URL_LEN 255",
+    next(line for line in fileSource.splitlines() if line.startswith("#define MAX_URL_LEN ")),
+)
+fsPrelude = r"""
 static unsigned filePos,fileLength=4096+37,fileCloses;static bool missingFile,userOnly;
 typedef struct {int dummy;} EspFsFile;
 static void *lastOpened;static EspFsFile fakeFile;static void *firmwareFsCtx=(void*)1,*userPageCtx=(void*)2;
@@ -106,8 +136,8 @@ static void httpdHeader(HttpdConnData *c,const char *name,const char *value){(vo
 static void httpdEndHeaders(HttpdConnData *c){(void)c;}
 static const char *httpdGetMimetype(char *url){(void)url;return "application/octet-stream";}
 static int httpdSend(HttpdConnData *c,const char *data,int n){if(n<0)n=strlen(data);assert(c->priv->sendBuffLen+n<=c->priv->sendBuffMax);memcpy(c->priv->sendBuff+c->priv->sendBuffLen,data,n);c->priv->sendBuffLen+=n;return 1;}
-'''
-tests = r'''
+"""
+tests = r"""
 static unsigned replies;
 static int reply(HttpdConnData *c){if(!c->conn)return HTTPD_CGI_DONE;replies++;httpdSend(c,"response",8);return HTTPD_CGI_DONE;}
 static void timerTick(void){assert(httpdReadTimer.armed);httpdReadTimer.armed=false;httpdReadTimer.fn(httpdReadTimer.arg);}
@@ -220,8 +250,41 @@ int main(void){
  assert(!allocations);
  puts("PASS actual HTTP ownership/scheduling: deferred reads, ACK admission, fair file/JSON turns, abort/reuse, synchronous writes, borrowed-buffer lifetime and OOM");
 }
-'''
-out=root/'.build-tests';out.mkdir(exist_ok=True);src=out/'test-httpd-lifetime.c';src.write_text(prelude+release+retire+connect+flush+work+sent+fsPrelude+fileCgi+process+tests)
-exe=out/'test-httpd-lifetime'
-subprocess.run(['gcc','-std=c99','-Wall','-Wextra','-Wno-unused-variable','-Wno-sign-compare','-fsanitize=address,undefined',str(src),'-o',str(exe)],check=True)
-subprocess.run([str(exe)],check=True,env={**__import__('os').environ,'ASAN_OPTIONS':'detect_stack_use_after_return=1'})
+"""
+out = root / ".build-tests"
+out.mkdir(exist_ok=True)
+src = out / "test-httpd-lifetime.c"
+src.write_text(
+    prelude
+    + release
+    + retire
+    + connect
+    + flush
+    + work
+    + sent
+    + fsPrelude
+    + fileCgi
+    + process
+    + tests
+)
+exe = out / "test-httpd-lifetime"
+subprocess.run(
+    [
+        "gcc",
+        "-std=c99",
+        "-Wall",
+        "-Wextra",
+        "-Wno-unused-variable",
+        "-Wno-sign-compare",
+        "-fsanitize=address,undefined",
+        str(src),
+        "-o",
+        str(exe),
+    ],
+    check=True,
+)
+subprocess.run(
+    [str(exe)],
+    check=True,
+    env={**__import__("os").environ, "ASAN_OPTIONS": "detect_stack_use_after_return=1"},
+)

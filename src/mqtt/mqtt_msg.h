@@ -54,73 +54,76 @@ enum mqtt_message_type {
 // Descriptor for a serialized MQTT message, this is returned by functions that compose a message
 // (It's really an MQTT packet in v3.1.1 terminology)
 typedef struct mqtt_message {
-  uint8_t* data;
+  uint8_t *data;
   uint16_t length;
 } mqtt_message_t;
 
 // Descriptor for a connection with message assembly storage
 typedef struct mqtt_connection {
   mqtt_message_t message; // resulting message
-  uint16_t message_id;	  // id of assembled message and memo to calculate next message id
-  uint8_t* buffer;	  // buffer for assembling messages
+  uint16_t message_id;    // id of assembled message and memo to calculate next message id
+  uint8_t *buffer;        // buffer for assembling messages
   uint16_t buffer_length; // buffer length
 } mqtt_connection_t;
 
 // Descriptor for a connect request
 typedef struct mqtt_connect_info {
-  char* client_id;
-  char* username;
-  char* password;
-  char* will_topic;
-  char* will_message;
+  char *client_id;
+  char *username;
+  char *password;
+  char *will_topic;
+  char *will_message;
   uint16_t keepalive;
   uint8_t will_qos;
   uint8_t will_retain;
   uint8_t clean_session;
 } mqtt_connect_info_t;
 
-static inline int ICACHE_FLASH_ATTR mqtt_get_type(const uint8_t* buffer) {
+static inline int ICACHE_FLASH_ATTR mqtt_get_type(const uint8_t *buffer) {
   return (buffer[0] & 0xf0) >> 4;
 }
 
-static inline int ICACHE_FLASH_ATTR mqtt_get_dup(const uint8_t* buffer) {
+static inline int ICACHE_FLASH_ATTR mqtt_get_dup(const uint8_t *buffer) {
   return (buffer[0] & 0x08) >> 3;
 }
 
-static inline int ICACHE_FLASH_ATTR mqtt_get_qos(const uint8_t* buffer) {
+static inline int ICACHE_FLASH_ATTR mqtt_get_qos(const uint8_t *buffer) {
   return (buffer[0] & 0x06) >> 1;
 }
 
-static inline int ICACHE_FLASH_ATTR mqtt_get_retain(const uint8_t* buffer) {
+static inline int ICACHE_FLASH_ATTR mqtt_get_retain(const uint8_t *buffer) {
   return (buffer[0] & 0x01);
 }
 
 // Init a connection descriptor
-void mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buffer_length);
+void mqtt_msg_init(mqtt_connection_t *connection, uint8_t *buffer, uint16_t buffer_length);
 
 // Returns the total length of a message including MQTT fixed header
-int mqtt_get_total_length(const uint8_t* buffer, uint16_t length);
+int mqtt_get_total_length(const uint8_t *buffer, uint16_t length);
 
 // Return pointer to topic, length in in/out param: in=length of buffer, out=length of topic
-const char* mqtt_get_publish_topic(const uint8_t* buffer, uint16_t* length);
+const char *mqtt_get_publish_topic(const uint8_t *buffer, uint16_t *length);
 
 // Return pointer to data, length in in/out param: in=length of buffer, out=length of data
-const char* mqtt_get_publish_data(const uint8_t* buffer, uint16_t* length);
+const char *mqtt_get_publish_data(const uint8_t *buffer, uint16_t *length);
 
 // Return message id
-uint16_t mqtt_get_id(const uint8_t* buffer, uint16_t length);
+uint16_t mqtt_get_id(const uint8_t *buffer, uint16_t length);
 
 // The following functions construct an outgoing message
-mqtt_message_t* mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info);
-mqtt_message_t* mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id);
-mqtt_message_t* mqtt_msg_puback(mqtt_connection_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_pubrec(mqtt_connection_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_pubrel(mqtt_connection_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_pubcomp(mqtt_connection_t* connection, uint16_t message_id);
-mqtt_message_t* mqtt_msg_subscribe(mqtt_connection_t* connection, const char* topic, int qos, uint16_t* message_id);
-mqtt_message_t* mqtt_msg_unsubscribe(mqtt_connection_t* connection, const char* topic, uint16_t* message_id);
-mqtt_message_t* mqtt_msg_pingreq(mqtt_connection_t* connection);
-mqtt_message_t* mqtt_msg_pingresp(mqtt_connection_t* connection);
-mqtt_message_t* mqtt_msg_disconnect(mqtt_connection_t* connection);
+mqtt_message_t *mqtt_msg_connect(mqtt_connection_t *connection, mqtt_connect_info_t *info);
+mqtt_message_t *mqtt_msg_publish(mqtt_connection_t *connection, const char *topic, const char *data,
+                                 int data_length, int qos, int retain, uint16_t *message_id);
+mqtt_message_t *mqtt_msg_puback(mqtt_connection_t *connection, uint16_t message_id);
+mqtt_message_t *mqtt_msg_pubrec(mqtt_connection_t *connection, uint16_t message_id);
+mqtt_message_t *mqtt_msg_pubrel(mqtt_connection_t *connection, uint16_t message_id);
+mqtt_message_t *mqtt_msg_pubcomp(mqtt_connection_t *connection, uint16_t message_id);
+mqtt_message_t *mqtt_msg_subscribe(mqtt_connection_t *connection, const char *topic, int qos,
+                                   uint16_t *message_id);
+mqtt_message_t *mqtt_msg_unsubscribe(mqtt_connection_t *connection, const char *topic,
+                                     uint16_t *message_id);
+mqtt_message_t *mqtt_msg_pingreq(mqtt_connection_t *connection);
+mqtt_message_t *mqtt_msg_pingresp(mqtt_connection_t *connection);
+mqtt_message_t *mqtt_msg_disconnect(mqtt_connection_t *connection);
 
 #endif // MQTT_MSG_H

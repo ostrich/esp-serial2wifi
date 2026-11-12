@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Fault-inject actual OTA handlers, verifier and flash guards without a device."""
+
 import _paths
 from pathlib import Path
 import subprocess
@@ -8,10 +9,10 @@ import flash_layout
 from flash_stubs import STUB, HTTP, SDK
 
 ROOT = Path(__file__).resolve().parents[2]
-PRIVATE = ROOT / '.build-tests/ota'
+PRIVATE = ROOT / ".build-tests/ota"
 PRIVATE.mkdir(parents=True, exist_ok=True)
 
-TEST = r'''
+TEST = r"""
 void (*programmingCB)(char *,short);
 int serbridgeInMCUFlashing(void){return 0;}
 bool serialInputPending(void){return false;}
@@ -112,27 +113,77 @@ int main(int argc,char **argv) {
  free(one);free(two);
  puts("PASS actual OTA: both slots, bad header/CRC/size, concurrent/aborted/misordered uploads, SDK/OOM failures, protected regions and reboot gate");
 }
-'''
+"""
 
 with tempfile.TemporaryDirectory(dir=PRIVATE) as name:
     work = Path(name)
-    (work / 'esp8266.h').write_text(STUB + SDK)
-    (work / 'httpd.h').write_text(HTTP)
-    (work / 'generated_flash_layout.h').write_text(flash_layout.header(flash_layout.layout('4MB')))
-    includes = ''.join('#include "' + str(ROOT/'src/core' / file) + '"\n'
-                       for file in ('operation.c','flash_layout.c', 'firmware_image.c', 'cgiflash.c'))
-    (work / 'test.c').write_text(includes + TEST)
-    for enabled,testing in ((0,0),(0,1),(1,0)):
-        subprocess.run(['gcc', '-std=c99', '-Wall', '-Wextra', '-Werror',
-                        '-Wno-misleading-indentation', '-fsanitize=address,undefined',
-                        '-DSERIAL2WIFI_OTA_ENABLED=' + str(enabled), '-DSERIAL2WIFI_OTA_TESTING=' + str(testing), '-I' + str(work),'-I'+str(ROOT/'tests/support/api-stubs'),'-I'+str(ROOT/'src/serial'),
-                        str(work / 'test.c'), '-o', str(work / 'test')], check=True)
-        subprocess.run([str(work / 'test'), str(ROOT / 'firmware/user1.bin'),
-                        str(ROOT / 'firmware/user2.bin')], check=True)
+    (work / "esp8266.h").write_text(STUB + SDK)
+    (work / "httpd.h").write_text(HTTP)
+    (work / "generated_flash_layout.h").write_text(flash_layout.header(flash_layout.layout("4MB")))
+    includes = "".join(
+        '#include "' + str(ROOT / "src/core" / file) + '"\n'
+        for file in ("operation.c", "flash_layout.c", "firmware_image.c", "cgiflash.c")
+    )
+    (work / "test.c").write_text(includes + TEST)
+    for enabled, testing in ((0, 0), (0, 1), (1, 0)):
+        subprocess.run(
+            [
+                "gcc",
+                "-std=c99",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-Wno-misleading-indentation",
+                "-fsanitize=address,undefined",
+                "-DSERIAL2WIFI_OTA_ENABLED=" + str(enabled),
+                "-DSERIAL2WIFI_OTA_TESTING=" + str(testing),
+                "-I" + str(work),
+                "-I" + str(ROOT / "tests/support/api-stubs"),
+                "-I" + str(ROOT / "src/serial"),
+                str(work / "test.c"),
+                "-o",
+                str(work / "test"),
+            ],
+            check=True,
+        )
+        subprocess.run(
+            [
+                str(work / "test"),
+                str(ROOT / "firmware/user1.bin"),
+                str(ROOT / "firmware/user2.bin"),
+            ],
+            check=True,
+        )
 
-    for target in ('512KB','1MB','2MB'):
-        (work/'generated_flash_layout.h').write_text(flash_layout.header(flash_layout.layout(target)))
-        subprocess.run(['gcc','-std=c99','-Wall','-Wextra','-Werror','-Wno-misleading-indentation',
-                        '-fsanitize=address,undefined','-DSERIAL2WIFI_OTA_ENABLED=1','-DSERIAL2WIFI_OTA_TESTING=0',
-                        '-I'+str(work),'-I'+str(ROOT/'tests/support/api-stubs'),'-I'+str(ROOT/'src/serial'),str(work/'test.c'),'-o',str(work/'test')],check=True)
-        subprocess.run([str(work/'test'),str(ROOT/'firmware/user1.bin'),str(ROOT/'firmware/user2.bin')],check=True)
+    for target in ("512KB", "1MB", "2MB"):
+        (work / "generated_flash_layout.h").write_text(
+            flash_layout.header(flash_layout.layout(target))
+        )
+        subprocess.run(
+            [
+                "gcc",
+                "-std=c99",
+                "-Wall",
+                "-Wextra",
+                "-Werror",
+                "-Wno-misleading-indentation",
+                "-fsanitize=address,undefined",
+                "-DSERIAL2WIFI_OTA_ENABLED=1",
+                "-DSERIAL2WIFI_OTA_TESTING=0",
+                "-I" + str(work),
+                "-I" + str(ROOT / "tests/support/api-stubs"),
+                "-I" + str(ROOT / "src/serial"),
+                str(work / "test.c"),
+                "-o",
+                str(work / "test"),
+            ],
+            check=True,
+        )
+        subprocess.run(
+            [
+                str(work / "test"),
+                str(ROOT / "firmware/user1.bin"),
+                str(ROOT / "firmware/user2.bin"),
+            ],
+            check=True,
+        )

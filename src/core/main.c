@@ -43,22 +43,21 @@
 
 #ifdef SYSLOG
 #include "syslog.h"
-#define NOTICE(format, ...) do {                                            \
-  LOG_NOTICE(format, ## __VA_ARGS__ );                                      \
-  os_printf(format "\n", ## __VA_ARGS__);                                   \
-} while ( 0 )
+#define NOTICE(format, ...)                                                                        \
+  do {                                                                                             \
+    LOG_NOTICE(format, ##__VA_ARGS__);                                                             \
+    os_printf(format "\n", ##__VA_ARGS__);                                                         \
+  } while (0)
 #else
-#define NOTICE(format, ...) do {                                            \
-  os_printf(format "\n", ## __VA_ARGS__);                                   \
-} while ( 0 )
+#define NOTICE(format, ...)                                                                        \
+  do {                                                                                             \
+    os_printf(format "\n", ##__VA_ARGS__);                                                         \
+  } while (0)
 #endif
 
 #ifdef MEMLEAK_DEBUG
 #include "mem.h"
-bool ICACHE_FLASH_ATTR check_memleak_debug_enable(void)
-{
-    return MEMLEAK_DEBUG_ENABLE;
-}
+bool ICACHE_FLASH_ATTR check_memleak_debug_enable(void) { return MEMLEAK_DEBUG_ENABLE; }
 #endif
 
 /*
@@ -71,7 +70,8 @@ handled top-down, so make sure to put more specific rules above the more
 general ones.
 */
 static int ICACHE_FLASH_ATTR cgiSdkRto(HttpdConnData *c) {
-  if (!c->conn) return HTTPD_CGI_DONE;
+  if (!c->conn)
+    return HTTPD_CGI_DONE;
   char buf[1024];
   sdk_rto_json(buf);
   jsonHeader(c, 200);
@@ -80,61 +80,60 @@ static int ICACHE_FLASH_ATTR cgiSdkRto(HttpdConnData *c) {
 }
 
 HttpdBuiltInUrl builtInUrls[] = {
-  { "/api/v1/capabilities", apiCapabilities, NULL },
-  { "/api/v1/status", apiStatus, NULL },
-  { "/api/v1/firmware", apiFirmwareInfo, NULL },
-  { "/api/v1/firmware/upload", apiFirmwareUpload, NULL },
-  { "/api/v1/firmware/activate", apiFirmwareActivate, NULL },
-  { "/api/v1/pages", apiPagesInfo, NULL },
-  { "/api/v1/pages/upload", apiPagesUpload, NULL },
-  { "/api/v1/pages/clear", apiPagesClear, NULL },
-  { "/api/v1/pages/*", apiPagesInfo, NULL },
-  { "/api/v1/settings", apiSettings, NULL },
-  { "/api/v1/integrations", apiIntegrations, NULL },
-  { "/api/v1/diagnostics/uart-log", apiDiagnosticsLogMode, NULL },
-  { "/api/v1/diagnostics/log", apiDiagnosticsLog, NULL },
-  { "/api/v1/settings/description", apiManagementSave, "description" },
-  { "/api/v1/settings/pins", apiManagementSave, "pins" },
-  { "/api/v1/settings/clock", apiManagementSave, "clock" },
-  { "/api/v1/settings/syslog", apiManagementSave, "syslog" },
-  { "/api/v1/settings/restart", apiManagementRestart, NULL },
-  { "/api/v1/integrations/mqtt", apiManagementSave, "mqtt" },
-  { "/api/v1/integrations/reporting", apiManagementSave, "reporting" },
-  { "/api/v1/integrations/slip", apiManagementSave, "slip" },
-  { "/api/v1/serial", apiSerial, NULL },
-  { "/api/v1/serial/live", apiSerialLive, NULL },
-  { "/api/v1/serial/capture", apiSerialCapture, NULL },
-  { "/api/v1/serial/capture/*", apiSerialCapture, NULL },
-  { "/api/v1/serial/uart", apiSerialUART, NULL },
-  { "/api/v1/serial/send", apiSerialSend, NULL },
-  { "/api/v1/serial/clear", apiSerialClear, NULL },
-  { "/api/v1/serial/reset-mcu", apiSerialReset, NULL },
-  { "/api/v1/network", apiNetwork, NULL },
-  { "/api/v1/network/station", apiNetworkStation, NULL },
-  { "/api/v1/network/ap", apiNetworkAP, NULL },
-  { "/api/v1/network/identity", apiNetworkIdentity, NULL },
-  { "/api/v1/network/scan", apiNetworkScan, NULL },
-  { "/api/v1/network/scan/*", apiNetworkScanPage, NULL },
-  { "/diag/rto", cgiSdkRto, NULL },
-  { "/", cgiRedirect, "/index.html" },
-  { "/menu", cgiMenu, NULL },
+    {"/api/v1/capabilities", apiCapabilities, NULL},
+    {"/api/v1/status", apiStatus, NULL},
+    {"/api/v1/firmware", apiFirmwareInfo, NULL},
+    {"/api/v1/firmware/upload", apiFirmwareUpload, NULL},
+    {"/api/v1/firmware/activate", apiFirmwareActivate, NULL},
+    {"/api/v1/pages", apiPagesInfo, NULL},
+    {"/api/v1/pages/upload", apiPagesUpload, NULL},
+    {"/api/v1/pages/clear", apiPagesClear, NULL},
+    {"/api/v1/pages/*", apiPagesInfo, NULL},
+    {"/api/v1/settings", apiSettings, NULL},
+    {"/api/v1/integrations", apiIntegrations, NULL},
+    {"/api/v1/diagnostics/uart-log", apiDiagnosticsLogMode, NULL},
+    {"/api/v1/diagnostics/log", apiDiagnosticsLog, NULL},
+    {"/api/v1/settings/description", apiManagementSave, "description"},
+    {"/api/v1/settings/pins", apiManagementSave, "pins"},
+    {"/api/v1/settings/clock", apiManagementSave, "clock"},
+    {"/api/v1/settings/syslog", apiManagementSave, "syslog"},
+    {"/api/v1/settings/restart", apiManagementRestart, NULL},
+    {"/api/v1/integrations/mqtt", apiManagementSave, "mqtt"},
+    {"/api/v1/integrations/reporting", apiManagementSave, "reporting"},
+    {"/api/v1/integrations/slip", apiManagementSave, "slip"},
+    {"/api/v1/serial", apiSerial, NULL},
+    {"/api/v1/serial/live", apiSerialLive, NULL},
+    {"/api/v1/serial/capture", apiSerialCapture, NULL},
+    {"/api/v1/serial/capture/*", apiSerialCapture, NULL},
+    {"/api/v1/serial/uart", apiSerialUART, NULL},
+    {"/api/v1/serial/send", apiSerialSend, NULL},
+    {"/api/v1/serial/clear", apiSerialClear, NULL},
+    {"/api/v1/serial/reset-mcu", apiSerialReset, NULL},
+    {"/api/v1/network", apiNetwork, NULL},
+    {"/api/v1/network/station", apiNetworkStation, NULL},
+    {"/api/v1/network/ap", apiNetworkAP, NULL},
+    {"/api/v1/network/identity", apiNetworkIdentity, NULL},
+    {"/api/v1/network/scan", apiNetworkScan, NULL},
+    {"/api/v1/network/scan/*", apiNetworkScanPage, NULL},
+    {"/diag/rto", cgiSdkRto, NULL},
+    {"/", cgiRedirect, "/index.html"},
+    {"/menu", cgiMenu, NULL},
 
-  { "/pgm/sync", cgiOptibootSync, NULL },
-  { "/pgm/upload", cgiOptibootData, NULL },
+    {"/pgm/sync", cgiOptibootSync, NULL},
+    {"/pgm/upload", cgiOptibootData, NULL},
 
-  { "/pgmmega/sync", cgiMegaSync, NULL },		// Start programming mode
-  { "/pgmmega/upload", cgiMegaData, NULL },		// Upload stuff
-  { "/pgmmega/read/*", cgiMegaRead, NULL },		// Download stuff (to verify)
-  { "/pgmmega/fuse/*", cgiMegaFuse, NULL },		// Read or write fuse
-  { "/pgmmega/rebootmcu", cgiMegaRebootMCU, NULL },	// Get out of programming mode
+    {"/pgmmega/sync", cgiMegaSync, NULL},           // Start programming mode
+    {"/pgmmega/upload", cgiMegaData, NULL},         // Upload stuff
+    {"/pgmmega/read/*", cgiMegaRead, NULL},         // Download stuff (to verify)
+    {"/pgmmega/fuse/*", cgiMegaFuse, NULL},         // Read or write fuse
+    {"/pgmmega/rebootmcu", cgiMegaRebootMCU, NULL}, // Get out of programming mode
 
 #ifdef WEBSERVER
-  { "/user/*", cgiUserFsHook, NULL },
-  { "*.json", WEB_CgiJsonHook, NULL }, //Catch-all cgi JSON queries
+    {"/user/*", cgiUserFsHook, NULL},
+    {"*.json", WEB_CgiJsonHook, NULL}, //Catch-all cgi JSON queries
 #endif
-  { "*", cgiEspFsHook, NULL }, //Catch-all cgi function for the filesystem
-  { NULL, NULL, NULL }
-};
+    {"*", cgiEspFsHook, NULL}, //Catch-all cgi function for the filesystem
+    {NULL, NULL, NULL}};
 
 #ifdef SHOW_HEAP_USE
 static ETSTimer prHeapTimer;
@@ -143,9 +142,9 @@ static void ICACHE_FLASH_ATTR prHeapTimerCb(void *arg) {
 }
 #endif
 
-# define VERS_STR_STR(V) #V
-# define VERS_STR(V) VERS_STR_STR(V)
-char* firmwareVersion = VERS_STR(VERSION);
+#define VERS_STR_STR(V) #V
+#define VERS_STR(V) VERS_STR_STR(V)
+char *firmwareVersion = VERS_STR(VERSION);
 
 // address of espfs binary blob
 #include "ui_storage.h"
@@ -153,8 +152,7 @@ extern uint32_t _binary_espfs_img_start;
 
 extern void mqtt_client_init(void);
 
-void ICACHE_FLASH_ATTR
-user_rf_pre_init(void) {
+void ICACHE_FLASH_ATTR user_rf_pre_init(void) {
   //default is enabled
   system_set_os_print(DEBUG_SDK);
 }
@@ -162,8 +160,7 @@ user_rf_pre_init(void) {
 /* user_rf_cal_sector_set is a required function that is called by the SDK to get a flash
  * sector number where it can store RF calibration data. This was introduced with SDK 1.5.4.1
  * and is necessary because Espressif ran out of pre-reserved flash sectors. Ooops...  */
-uint32 ICACHE_FLASH_ATTR
-user_rf_cal_sector_set(void) {
+uint32 ICACHE_FLASH_ATTR user_rf_cal_sector_set(void) {
   return FLASH_RF_START / SPI_FLASH_SEC_SIZE;
 }
 
@@ -171,13 +168,13 @@ user_rf_cal_sector_set(void) {
 void ICACHE_FLASH_ATTR user_pre_init(void) {
   if (!flashLayoutRegister()) {
     os_printf("Flash geometry/partition registration failed; recover over serial\n");
-    while (1) { } // Never continue into SDK writes with an invalid table.
+    while (1) {
+    } // Never continue into SDK writes with an invalid table.
   }
 }
 
 // Main routine to initialize ESP Serial2WiFi.
-void ICACHE_FLASH_ATTR
-user_init(void) {
+void ICACHE_FLASH_ATTR user_init(void) {
   // uncomment the following three lines to see flash config messages for troubleshooting
   //uart_init(115200, 115200);
   //logInit();
@@ -187,7 +184,7 @@ user_init(void) {
   bool restoreOk = configRestore();
   // Init gpio pin registers
   gpio_init();
-  gpio_output_set(0, 0, 0, (1<<15)); // some people tie it to GND, gotta ensure it's disabled
+  gpio_output_set(0, 0, 0, (1 << 15)); // some people tie it to GND, gotta ensure it's disabled
   // init UART
   uart_init(CALC_UARTMODE(flashConfig.data_bits, flashConfig.parity, flashConfig.stop_bits),
             flashConfig.baud_rate, 115200);
@@ -230,12 +227,11 @@ user_init(void) {
 
   struct rst_info *rst_info = system_get_rst_info();
   NOTICE("Reset cause: %d", rst_info->reason);
-  NOTICE("exccause=%d epc1=0x%x epc2=0x%x epc3=0x%x excvaddr=0x%x depc=0x%x",
-    rst_info->exccause, rst_info->epc1, rst_info->epc2, rst_info->epc3,
-    rst_info->excvaddr, rst_info->depc);
+  NOTICE("exccause=%d epc1=0x%x epc2=0x%x epc3=0x%x excvaddr=0x%x depc=0x%x", rst_info->exccause,
+         rst_info->epc1, rst_info->epc2, rst_info->epc3, rst_info->excvaddr, rst_info->depc);
   uint32_t fid = spi_flash_get_id();
-  NOTICE("Flash map %d, manuf 0x%02X chip 0x%04X", system_get_flash_size_map(),
-      fid & 0xff, (fid&0xff00)|((fid>>16)&0xff));
+  NOTICE("Flash map %d, manuf 0x%02X chip 0x%04X", system_get_flash_size_map(), fid & 0xff,
+         (fid & 0xff00) | ((fid >> 16) & 0xff));
   NOTICE("** %s: ready, heap=%ld", firmwareVersion, (unsigned long)system_get_free_heap_size());
 
   // Init SNTP service

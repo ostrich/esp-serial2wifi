@@ -1,5 +1,6 @@
 """Synthetic flash and HTTP/SDK interfaces shared by native storage tests."""
-STUB = r'''
+
+STUB = r"""
 #pragma once
 #include <stdint.h>
 #include <stdbool.h>
@@ -37,8 +38,8 @@ static int spi_flash_erase_sector(uint32_t s) {
 static int spi_flash_read(uint32_t a,uint32_t *p,uint32_t n) {
  if(fail_read)return 1;memcpy(p,memory+a,n);if(corrupt_read&&n)*p^=1;return 0;
 }
-'''
-HTTP = r'''
+"""
+HTTP = r"""
 #pragma once
 typedef struct {int len,buffLen,received;char *buff;} HttpdPostData;
 typedef struct {void *conn,*cgiPrivData;HttpdPostData *post;int requestType,code;} HttpdConnData;
@@ -48,8 +49,8 @@ typedef struct {void *conn,*cgiPrivData;HttpdPostData *post;int requestType,code
 static void httpdStartResponse(HttpdConnData *c,int code) {c->code=code;}
 static void httpdHeader(HttpdConnData *c,const char *name,const char *value) {(void)c;(void)name;(void)value;}
 static void httpdEndHeaders(HttpdConnData *c) {(void)c;}
-'''
-SDK = r'''
+"""
+SDK = r"""
 #include <stdio.h>
 #include <stdlib.h>
 #define os_memset memset
@@ -68,4 +69,4 @@ static void system_upgrade_reboot(void) {}
 static void os_timer_disarm(ETSTimer *t) {(void)t;}
 static void os_timer_setfn(ETSTimer *t,os_timer_func_t *f,void *p) {(void)t;(void)f;(void)p;}
 static void os_timer_arm(ETSTimer *t,unsigned n,int repeat) {(void)t;assert(n==2000&&!repeat);scheduled++;}
-'''
+"""

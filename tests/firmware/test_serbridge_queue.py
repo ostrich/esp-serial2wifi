@@ -1,24 +1,26 @@
 #!/usr/bin/env python3
 """Exercise actual block queue ownership, SDK faults and multiple clients."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
 import re
 import subprocess
 
 root = Path(__file__).resolve().parents[2]
-source = (root / 'src/serial/serbridge.c').read_text()
-header = (root / 'src/serial/serbridge.h').read_text()
-a = source.index('static void ICACHE_FLASH_ATTR\nreleaseCopiedTxBlocks(')
-b = source.index('void ICACHE_FLASH_ATTR\nconsole_process', a)
+source = SourceText((root / "src/serial/serbridge.c").read_text())
+header = SourceText((root / "src/serial/serbridge.h").read_text())
+a = source.index("static void ICACHE_FLASH_ATTR\nreleaseCopiedTxBlocks(")
+b = source.index("void ICACHE_FLASH_ATTR\nconsole_process", a)
 functions = source[a:b]
-a = source.index('static bool ICACHE_FLASH_ATTR\nholdUartInput(')
-b = source.index('// Generate a reset pulse',a)
+a = source.index("static bool ICACHE_FLASH_ATTR\nholdUartInput(")
+b = source.index("// Generate a reset pulse", a)
 input_functions = source[a:b]
-a = header.index('typedef struct TxBlock')
-b = header.index('} serbridgeConnData;', a) + len('} serbridgeConnData;')
+a = header.index("typedef struct TxBlock")
+b = header.index("} serbridgeConnData;", a) + len("} serbridgeConnData;")
 records = header[a:b]
-macros = '\n'.join(re.findall(r'^#define (?:TX_BLOCK_BYTES|MAX_TXBUFFER) .+$', header, re.M))
-prelude = r'''
+macros = "\n".join(re.findall(r"^#define (?:TX_BLOCK_BYTES|MAX_TXBUFFER) .+$", header, re.M))
+prelude = r"""
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -67,8 +69,8 @@ static int espconn_sent(struct espconn *c,uint8_t *data,unsigned size){
  if(!defer_copy)c->sequence+=length;
  if(reject_send){reject_send=0;return -1;}return 0;
 }
-'''
-input_stubs = r'''
+"""
+input_stubs = r"""
 #define MAX_CONN 4
 #define MAX_RXBUFFER (2*1460)
 #define READ_PERI_REG(r) 0U
@@ -90,8 +92,8 @@ static void serledFlash(unsigned n){(void)n;}
 static void programmingState(serbridgeConnData *c,bool on){c->programming_owned=on;}
 static void uart0_tx_buffer(char *p,unsigned n){assert(uartUsed+n<=sizeof uartWire);memcpy(uartWire+uartUsed,p,n);uartUsed+=n;}
 static uint16 telnetUnwrap(serbridgeConnData *c,uint8_t *p,unsigned n){(void)c;uart0_tx_buffer((char*)p,n);return n;}
-'''
-tests = r'''
+"""
+tests = r"""
 static void init(serbridgeConnData *c,struct espconn *s){memset(c,0,sizeof *c);memset(s,0,sizeof *s);c->conn=s;c->readytosend=true;s->reverse=c;}
 static void ack(serbridgeConnData *c){
  struct espconn *s=c->conn;assert(s->count);
@@ -214,11 +216,35 @@ int main(void){
  recoveryTests();
  puts("PASS actual TCP block queue: deferred/partial credit, exact ordering, borrowed-buffer lifetime, small multiple clients, bounds, OOM/reserve and ambiguous SDK failure");
 }
-'''
-build = root / '.build-tests/bridge'
+"""
+build = root / ".build-tests/bridge"
 build.mkdir(parents=True, exist_ok=True)
-cfile = build / 'test.c'
-cfile.write_text(prelude + '\n' + macros + '\n' + records + '\n' + input_stubs + '\n' + functions + input_functions + tests)
-subprocess.run(['gcc', '-std=c99', '-Wall', '-Wextra', '-Werror', '-fsanitize=address,undefined',
-                str(cfile), '-o', str(build / 'test')], check=True)
-subprocess.run([str(build / 'test')], check=True)
+cfile = build / "test.c"
+cfile.write_text(
+    prelude
+    + "\n"
+    + macros
+    + "\n"
+    + records
+    + "\n"
+    + input_stubs
+    + "\n"
+    + functions
+    + input_functions
+    + tests
+)
+subprocess.run(
+    [
+        "gcc",
+        "-std=c99",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fsanitize=address,undefined",
+        str(cfile),
+        "-o",
+        str(build / "test"),
+    ],
+    check=True,
+)
+subprocess.run([str(build / "test")], check=True)

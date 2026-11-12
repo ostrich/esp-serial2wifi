@@ -1,95 +1,677 @@
-import {validFirmware,validPages,checkFirmware,checkPages,bootOutcome} from './update-model.js';
-import {el} from './core.js';
-export function mountUpdates(container,api,notice,kind='firmware'){
- const firmware=kind==='firmware',path='/api/v1/'+kind,validate=firmware?validFirmware:validPages;
- let info=null,files=[],busy=false,destroyed=false,flight=null,controller=null,selected=0,accepted=null,activation=null,stagedKey=null,previousStatus=null;
- const operationOwner={};
- const infoKey=v=>firmware?JSON.stringify([v.version,v.sdk,v.image_abi,v.flash_bytes,v.active_slot,v.target_slot,v.max_image_bytes,v.external_ui]):String(v.capacity_bytes)+':'+v.html_prefix_bytes;
- const status=el('p','Loading device information…');status.id='update-state';status.setAttribute('role','status');
- const details=el('dl','','details'),reload=el('button','Reload device information','quiet');reload.type='button';reload.id='update-reload';
- const reloadActions=el('div','','form-actions update-toolbar');reloadActions.append(reload);
- const help=el('p',firmware?'Uploading stores the new firmware separately and keeps the current firmware running. Activate uploaded firmware restarts ESP Serial2WiFi with the new version. Keep a full flash backup so you can restore the device over USB if the update won’t start. Changing SDK versions requires USB flashing.':'Uploading replaces every installed custom-page file. Select all the files you want to keep, and keep a copy on your computer.');
- const warning=el('p','Before uploading, stop serial output from the attached device, close TCP serial clients and finish any MCU programming.');
- const form=el('form');form.id='update-form';form.noValidate=true;
- const label=el('label',firmware?'Application image':'Replacement custom-page files'),input=el('input');input.type='file';input.id='update-files';input.multiple=!firmware;label.htmlFor=input.id;
- const fileStatus=el('p','No file selected.');fileStatus.id='update-file-state';fileStatus.setAttribute('role','status');
- const expectedLabel=el('label','Expected firmware version (optional)'),expected=el('input');expected.type='text';expected.id='update-version';expected.maxLength=96;expected.placeholder='esp-serial2wifi v…';expectedLabel.htmlFor=expected.id;
- const confirmation=el('input');confirmation.type='checkbox';confirmation.id='update-replace-confirm';const confirmLabel=el('label',firmware?'I have a full flash backup I can restore over USB.':'Replace all installed custom pages with these files.');confirmLabel.htmlFor=confirmation.id;
- const submit=el('button',firmware?'Upload application image':'Replace custom pages');submit.type='submit';
- const progress=el('progress');progress.max=1;progress.value=0;progress.hidden=true;progress.setAttribute('aria-label','Transfer progress');
- const transfer=el('p');transfer.id='update-transfer';transfer.setAttribute('role','status');
- form.append(label,input,fileStatus);if(firmware)form.append(expectedLabel,expected);const confirmRow=el('div','','upload-confirm');confirmRow.append(confirmation,confirmLabel);const actions=el('div','','form-actions');actions.append(submit);form.append(confirmRow);if(firmware){confirmRow.classList.add('firmware-confirm');const backupHelp=el('p','Checking this enables uploading. It doesn’t create or verify a backup.','field-hint');backupHelp.id='update-backup-help';confirmation.setAttribute('aria-describedby',backupHelp.id);form.append(backupHelp);}form.append(actions,progress,transfer);
- const activate=el('button','Activate uploaded firmware','quiet');activate.type='button';activate.hidden=true;activate.id='update-activate';
- const bootWarning='Restarting ESP Serial2WiFi sends boot messages to the attached serial device. Before activating, make sure the attached device can safely receive those bytes, or disconnect ESP TX from its RX pin. If you are using a serial shell, log out first.';
- const activationArea=el('section','','network-recovery');activationArea.id='update-activation';activationArea.hidden=true;
- const bootNotice=el('p',bootWarning);bootNotice.id='update-boot-warning';activate.setAttribute('aria-describedby',bootNotice.id);
- const activationActions=el('div','','form-actions');activationActions.append(activate);activationArea.append(bootNotice,activationActions);
-
- const remove=el('button','Remove all custom pages','quiet');remove.type='button';remove.id='update-remove';
- const inventory=el('ul');inventory.id='update-inventory';const inventoryState=el('p');inventoryState.id='update-inventory-state';inventoryState.setAttribute('role','status');const pager=el('div','','form-actions file-pager'),position=el('p'),previous=el('button','Previous file','quiet'),next=el('button','Next file','quiet');previous.type=next.type='button';pager.id='update-pager';pager.hidden=true;pager.append(position,previous,next);const clearActions=el('div','','form-actions file-clear');clearActions.hidden=true;clearActions.append(remove);const installed=el('section','','installed-files');installed.append(el('h2','Installed files'),inventoryState,inventory,pager,clearActions);
- container.dataset.updateState='loading';container.replaceChildren(help,warning,status,details,reloadActions,form);if(firmware){const recovery=el('details'),title=el('summary','Serial recovery');recovery.append(title,el('p','Disconnect the attached device’s TX/RX wires, connect the ESP to a USB UART adapter, and back up its flash. Flash with esptool using the images and addresses in your build’s release-manifest.json. Use the instructions for your flash layout; the wrong addresses can overwrite settings or radio data.'));container.append(activationArea,recovery);}else{
-  const intro=el('p','Host small web pages on this ESP, such as a sensor display or controls for an attached microcontroller. This is optional; the serial bridge works without it.','management-intro');
-  const setup=el('details','','custom-page-help');setup.id='custom-page-help';
-  const steps=el('ol');for(const text of ['Create your page content and any supporting JavaScript, CSS or image files.','Upload all the files together below.','Open an installed file to view it. For example, panel.html is served at /user/panel.html.'])steps.append(el('li',text));
-  const example=el('pre','<h1>Sensor readings</h1>\n<p id="reading">Waiting for data…</p>');
-  const link=el('a','ELClient custom-page examples (upstream)');link.href='https://github.com/jeelabs/esp-link/blob/master/WEB-SERVER.md';link.target='_blank';link.rel='noopener';const links=el('p');links.append(link);
-  const integration=el('a','Microcontroller integration settings');integration.href='#/integrations';const integrationLink=el('p');integrationLink.append(integration);
-  setup.append(el('summary','How to create a custom web page'),steps,el('h3','HTML files'),el('p','ESP Serial2WiFi adds the opening HTML document, stylesheets and helper scripts to each .html file when you upload it. Write the content that goes inside the page; leave out <!doctype>, <html>, <head> and <body>. For example:'),example,el('h3','Interactive controls and readings'),el('p','The built-in helpers exchange messages with an attached microcontroller running ELClient or compatible firmware. That firmware supplies readings and handles button presses. It also needs Microcontroller integration enabled. Uploading a page alone does not connect it to the serial device.'),el('p','This uses ESP Serial2WiFi’s command protocol over SLIP, which separates messages on the serial connection. Ordinary serial devices do not understand these commands.'),integrationLink,links);
-  container.prepend(intro,setup,el('h2','Upload files'));container.append(installed);
- }
- function message(value,state){if(destroyed)return;status.textContent=value;if(state)container.dataset.updateState=state;}
- function setBusy(value){if(destroyed)return;busy=value;input.disabled=expected.disabled=confirmation.disabled=reload.disabled=remove.disabled=previous.disabled=next.disabled=value;activate.disabled=value;updateControls();container.dispatchEvent(new CustomEvent('device-operation',{bubbles:true,detail:{busy:value,owner:operationOwner}}));}
- function updateControls(){if(destroyed)return;input.disabled=busy||!!activation||!info;expected.disabled=busy||!!activation;form.hidden=firmware&&info&&!info.ota_supported;submit.disabled=busy||!!activation||!files.length||stagedKey!==infoKey(info||{})||!confirmation.checked||!info||(firmware&&!info.ota_supported);if(!firmware){pager.hidden=!info?.valid||!(info.index>0||info.next!==null);clearActions.hidden=!info||info.valid&&!info.count;previous.disabled=busy||!info||info.index===0;next.disabled=busy||!info||info.next===null;remove.disabled=busy||!info;}}
- function clearSelection(){selected++;files=[];stagedKey=null;accepted=null;activate.hidden=true;input.value='';confirmation.checked=false;fileStatus.textContent='No file selected.';}
- function showInfo(value){if(destroyed)return;if(info&&!activation&&infoKey(info)!==infoKey(value)&&(files.length||accepted)){clearSelection();fileStatus.textContent='Device information changed. Select the files again.';}info=value;details.replaceChildren();
-  if(firmware){activationArea.hidden=!value.ota_supported;if(value.external_ui)help.textContent='Choose the .elu package for the target slot shown below. It includes the firmware and web interface. Upload it, then activate it to restart ESP Serial2WiFi. Keep your USB recovery backup.';input.accept=value.external_ui?'.elu':'.bin';label.firstChild.textContent=value.external_ui?'Firmware/UI update package':'Application image';submit.textContent=value.external_ui?'Upload firmware and web interface':'Upload application image';}
-
-  const rows=firmware?[['Version',value.version],['SDK',value.sdk],['Active slot',value.active_slot??'Unknown'],['Target slot',value.target_slot??'Unknown'],['Flash capacity',value.flash_bytes+' bytes'],[value.external_ui?'Maximum update':'Maximum image',value.max_image_bytes+' bytes'],['OTA supported',value.ota_supported?'Yes':'No — '+(value.reason||'Unavailable')]]:[['Capacity',value.capacity_bytes+' bytes'],['Used',value.used_bytes===null?'Unknown':value.used_bytes+' bytes'],['Files',value.count+(value.truncated?' or more':'')],['HTML wrapper overhead',value.html_prefix_bytes+' bytes per .html file']];
-  for(const [label,value] of rows)details.append(el('dt',label),el('dd',String(value)));
-  if(!firmware){inventory.replaceChildren();inventory.hidden=!value.valid||!value.files.length;inventoryState.hidden=value.valid&&!!value.count;inventoryState.textContent=!value.valid?'Custom-page storage couldn’t be read. Upload files to replace it, or clear storage to start empty.':'No custom pages installed.';remove.textContent=value.valid?'Remove all custom pages':'Clear custom-page storage';position.textContent='File '+(value.index+1)+' of '+value.count+(value.truncated?'+':'');
-   for(const file of value.files){const li=el('li'),link=el('a',file.name);link.href='/user/'+encodeURIComponent(file.name);link.target='_blank';link.rel='noopener';li.append(link,el('span',' — '+file.bytes.toLocaleString()+' bytes'));inventory.append(li);}}
-  updateControls();
- }
- async function refresh(index=0){if(destroyed||busy||flight)return flight;controller?.abort();const signal=(controller=new AbortController()).signal;
-  flight=api.request(path+(index?'/'+index:''),{signal,retries:0,validate}).then(value=>{if(destroyed||signal.aborted)return;showInfo(value);message(firmware&&!value.ota_supported?(value.reason||'OTA unavailable')+'. See Serial recovery below for USB flashing instructions.':'Device information loaded.','ready');}).catch(()=>{if(!destroyed&&!signal.aborted)message('Device information is unavailable. Check connectivity and use Reload device information.','unavailable');}).finally(()=>{flight=null;});return flight;
- }
- input.addEventListener('change',async()=>{const generation=++selected;files=[];accepted=null;activation=null;activate.hidden=true;confirmation.checked=false;updateControls();const proposed=[...input.files],checkedInfo=info;if(!proposed.length){fileStatus.textContent='No file selected.';return;}
-  try{if(!info)throw new Error('Load device information before selecting files.');if(firmware){if(!info.ota_supported)throw new Error(info.reason||'OTA is unavailable.');if(proposed[0].size<1024||proposed[0].size>info.max_image_bytes)throw new Error('Choose a firmware file between 1024 and '+info.max_image_bytes.toLocaleString()+' bytes.');checkFirmware(new Uint8Array(await proposed[0].arrayBuffer()),info);}else checkPages(proposed,info);
-   if(destroyed||generation!==selected)return;if(infoKey(checkedInfo)!==infoKey(info))throw new Error('Device information changed. Select the files again.');stagedKey=infoKey(info);files=proposed;fileStatus.textContent=proposed.map(f=>f.name+' ('+f.size.toLocaleString()+' bytes)').join(', ')+(firmware?'. Header and layout checks passed; the device validates the full image.':'. Capacity and filename checks passed.');
-  }catch(error){if(generation===selected)fileStatus.textContent=error.message;}updateControls();
- });
- expected.addEventListener('input',()=>{if(accepted&&!activation)accepted.version=expected.value.trim();});
- confirmation.addEventListener('change',updateControls);reload.addEventListener('click',()=>refresh(info?.index||0));previous.addEventListener('click',()=>refresh(Math.max(0,info.index-1)));next.addEventListener('click',()=>refresh(info.next));
- async function verifyPages(proposed,signal){
-  const first=await api.request(path,{signal,retries:0,validate:validPages});if(!first.valid||first.count!==proposed.length||first.truncated)throw new Error('Inventory count could not be verified.');
-  const byName=new Map(proposed.map(f=>[f.name,f]));let page=first;
-  for(let i=0;i<proposed.length;i++){
-   if(i)page=await api.request(path+'/'+i,{signal,retries:0,validate:validPages});const stored=page.files[0],file=stored&&byName.get(stored.name);if(!file)throw new Error('Stored filenames differ from the selection.');
-   const prefix=file.name.endsWith('.html')?first.html_prefix_bytes:0;
-   const actual=await api.request('/user/'+encodeURIComponent(file.name),{signal,retries:0,timeout:120000,responseType:'bytes'}),wanted=new Uint8Array(await file.arrayBuffer());
-   if(actual.length!==wanted.length+prefix||stored.bytes!==actual.length||wanted.some((b,n)=>b!==actual[n+prefix]))throw new Error('Stored file content could not be verified.');byName.delete(stored.name);
+import {
+  validFirmware,
+  validPages,
+  checkFirmware,
+  checkPages,
+  bootOutcome
+} from "./update-model.js";
+import { el } from "./core.js";
+export function mountUpdates(container, api, notice, kind = "firmware") {
+  const firmware = kind === "firmware",
+    path = "/api/v1/" + kind,
+    validate = firmware ? validFirmware : validPages;
+  let info = null,
+    files = [],
+    busy = false,
+    destroyed = false,
+    flight = null,
+    controller = null,
+    selected = 0,
+    accepted = null,
+    activation = null,
+    stagedKey = null,
+    previousStatus = null;
+  const operationOwner = {};
+  const infoKey = (v) =>
+    firmware
+      ? JSON.stringify([
+          v.version,
+          v.sdk,
+          v.image_abi,
+          v.flash_bytes,
+          v.active_slot,
+          v.target_slot,
+          v.max_image_bytes,
+          v.external_ui
+        ])
+      : String(v.capacity_bytes) + ":" + v.html_prefix_bytes;
+  const status = el("p", "Loading device information…");
+  status.id = "update-state";
+  status.setAttribute("role", "status");
+  const details = el("dl", "", "details"),
+    reload = el("button", "Reload device information", "quiet");
+  reload.type = "button";
+  reload.id = "update-reload";
+  const reloadActions = el("div", "", "form-actions update-toolbar");
+  reloadActions.append(reload);
+  const help = el(
+    "p",
+    firmware
+      ? "Uploading stores the new firmware separately and keeps the current firmware running. Activate uploaded firmware restarts ESP Serial2WiFi with the new version. Keep a full flash backup so you can restore the device over USB if the update won’t start. Changing SDK versions requires USB flashing."
+      : "Uploading replaces every installed custom-page file. Select all the files you want to keep, and keep a copy on your computer."
+  );
+  const warning = el(
+    "p",
+    "Before uploading, stop serial output from the attached device, close TCP serial clients and finish any MCU programming."
+  );
+  const form = el("form");
+  form.id = "update-form";
+  form.noValidate = true;
+  const label = el("label", firmware ? "Application image" : "Replacement custom-page files"),
+    input = el("input");
+  input.type = "file";
+  input.id = "update-files";
+  input.multiple = !firmware;
+  label.htmlFor = input.id;
+  const fileStatus = el("p", "No file selected.");
+  fileStatus.id = "update-file-state";
+  fileStatus.setAttribute("role", "status");
+  const expectedLabel = el("label", "Expected firmware version (optional)"),
+    expected = el("input");
+  expected.type = "text";
+  expected.id = "update-version";
+  expected.maxLength = 96;
+  expected.placeholder = "esp-serial2wifi v…";
+  expectedLabel.htmlFor = expected.id;
+  const confirmation = el("input");
+  confirmation.type = "checkbox";
+  confirmation.id = "update-replace-confirm";
+  const confirmLabel = el(
+    "label",
+    firmware
+      ? "I have a full flash backup I can restore over USB."
+      : "Replace all installed custom pages with these files."
+  );
+  confirmLabel.htmlFor = confirmation.id;
+  const submit = el("button", firmware ? "Upload application image" : "Replace custom pages");
+  submit.type = "submit";
+  const progress = el("progress");
+  progress.max = 1;
+  progress.value = 0;
+  progress.hidden = true;
+  progress.setAttribute("aria-label", "Transfer progress");
+  const transfer = el("p");
+  transfer.id = "update-transfer";
+  transfer.setAttribute("role", "status");
+  form.append(label, input, fileStatus);
+  if (firmware) form.append(expectedLabel, expected);
+  const confirmRow = el("div", "", "upload-confirm");
+  confirmRow.append(confirmation, confirmLabel);
+  const actions = el("div", "", "form-actions");
+  actions.append(submit);
+  form.append(confirmRow);
+  if (firmware) {
+    confirmRow.classList.add("firmware-confirm");
+    const backupHelp = el(
+      "p",
+      "Checking this enables uploading. It doesn’t create or verify a backup.",
+      "field-hint"
+    );
+    backupHelp.id = "update-backup-help";
+    confirmation.setAttribute("aria-describedby", backupHelp.id);
+    form.append(backupHelp);
   }
-  showInfo(first);
- }
- form.addEventListener('submit',async event=>{event.preventDefault();if(submit.disabled)return;const proposed=[...files];controller?.abort();const signal=(controller=new AbortController()).signal;setBusy(true);progress.hidden=false;progress.value=0;transfer.textContent='Transferring…';accepted=null;activation=null;activate.hidden=true;
-  try{let body;if(firmware)body=proposed[0];else{body=new FormData();for(const file of proposed)body.append('webpage',file,file.name);}
-   await api.request(path+'/upload',{method:'POST',body,signal,retries:0,timeout:180000,responseType:'text',onUploadProgress:({loaded,total})=>{if(destroyed)return;if(total){progress.value=loaded/total;transfer.textContent='Uploading: '+Math.floor(100*loaded/total)+'% — checking the upload next.';}else transfer.textContent='Transferred '+loaded.toLocaleString()+' bytes; awaiting device response.';}});
-   if(destroyed||signal.aborted)return;progress.value=1;transfer.textContent='Transfer completed; device accepted the upload.';
-   if(firmware){accepted={before:info.active_slot,target:info.target_slot,version:expected.value.trim()};activate.hidden=false;message('Upload checked and ready. Click Activate uploaded firmware to restart ESP Serial2WiFi with it.','uploaded');}
-   else{message('Upload received. Checking the saved files…','verifying');await verifyPages(proposed,signal);message('Custom pages uploaded and checked.','verified');files=[];input.value='';confirmation.checked=false;fileStatus.textContent='No file selected.';}
-  }catch(error){message(error.ambiguous?'The connection closed during upload. Reload the device information before trying again. If ESP Serial2WiFi won’t boot, use Serial recovery.':'The upload couldn’t be checked. Your files are still selected. Reload the device information before trying again.','unverified');}
-  finally{if(!destroyed)setBusy(false);}
- });
- activate.addEventListener('click',async()=>{if(destroyed||activation||!accepted||busy||!confirm('Activate the uploaded firmware? ESP Serial2WiFi will restart and disconnect Wi-Fi/TCP.\n\n'+bootWarning+'\n\nNo automatic rollback is available.'))return;controller?.abort();const signal=(controller=new AbortController()).signal;setBusy(true);activation=Object.freeze({...accepted,version:expected.value.trim()});activate.hidden=true;
-  try{await api.request('/api/v1/firmware/activate',{method:'POST',body:new URLSearchParams({action:'activate_firmware'}),signal,retries:0,responseType:'text'});if(destroyed)return;message('Activation requested. Keep this page open, reconnect to the recovery AP/network, then use Refresh device to verify the running slot/version.','awaiting-reconnect');}
-  catch(error){if(destroyed)return;if(!error.ambiguous){activation=null;activate.hidden=false;}message(error.ambiguous?'The connection closed before ESP Serial2WiFi replied. Reconnect and check which firmware is running before trying again.':'ESP Serial2WiFi couldn’t activate the new firmware. Reload the device information before trying again.','unverified');}
-  finally{if(!destroyed)setBusy(false);}
- });
- remove.addEventListener('click',async()=>{if(busy||!info||!confirm('Clear custom-page storage and remove all installed files? Keep a backup; this cannot be undone.'))return;controller?.abort();const signal=(controller=new AbortController()).signal;setBusy(true);
-  try{const value=await api.request('/api/v1/pages/clear',{method:'POST',body:new URLSearchParams({action:'remove_all_pages'}),signal,retries:0,validate:validPages});const saved=await api.request(path,{signal,retries:0,validate:validPages});if(!value.valid||value.count||!saved.valid||saved.count)throw new Error('Removal unverified');showInfo(saved);message('All custom pages removed.','verified');}
-  catch(error){if(destroyed)return;message(error.ambiguous?'The connection closed before ESP Serial2WiFi replied. Reload the file list before trying again.':'Couldn’t confirm the removal. Reload the file list to check.','unverified');}
-  finally{if(!destroyed)setBusy(false);}
- });
- const unload=event=>{if(busy||files.length||accepted){event.preventDefault();event.returnValue='';}};window.addEventListener('beforeunload',unload);updateControls();refresh();
- return {refresh:()=>refresh(info?.index||0),updateFailure(error,stopped){if(activation&&stopped)message('Couldn’t reconnect after the restart. Rejoin ESP Serial2WiFi’s Wi-Fi, then click Retry connection. If it won’t boot, restore your backup over USB.','unverified');},updateStatus(s){const changed=previousStatus&&(s.firmware.version!==previousStatus.firmware.version||s.firmware.slot!==previousStatus.firmware.slot||s.system.uptime_ms!==null&&previousStatus.system.uptime_ms!==null&&s.system.uptime_ms<previousStatus.system.uptime_ms);previousStatus=s;if(!activation&&firmware&&info&&changed){if(busy)controller?.abort();clearSelection();info=null;message('Firmware changed. Reload device information before selecting an update.','unavailable');updateControls();}if(activation){const outcome=bootOutcome(s,activation.before,activation.target,activation.version);message(outcome.message,outcome.state);if(outcome.state!=='waiting'&&info)showInfo({...info,version:s.firmware.version,sdk:s.firmware.sdk,active_slot:activation.target,target_slot:activation.before,ota_supported:s.firmware.ota_eligible,reason:s.firmware.ota_eligible?null:'OTA unavailable on the running build'});if(outcome.state!=='waiting'){activation=null;clearSelection();updateControls();}}},canLeave:()=>!(busy||files.length||accepted)||confirm(busy?'Leave during the upload? Keep this page open to see whether it finishes.':'Leave this page and discard the selected files?'),destroy(){destroyed=true;selected++;controller?.abort();files=[];input.value='';window.removeEventListener('beforeunload',unload);if(busy)container.dispatchEvent(new CustomEvent('device-operation',{bubbles:true,detail:{busy:false,owner:operationOwner}}));}};
+  form.append(actions, progress, transfer);
+  const activate = el("button", "Activate uploaded firmware", "quiet");
+  activate.type = "button";
+  activate.hidden = true;
+  activate.id = "update-activate";
+  const bootWarning =
+    "Restarting ESP Serial2WiFi sends boot messages to the attached serial device. Before activating, make sure the attached device can safely receive those bytes, or disconnect ESP TX from its RX pin. If you are using a serial shell, log out first.";
+  const activationArea = el("section", "", "network-recovery");
+  activationArea.id = "update-activation";
+  activationArea.hidden = true;
+  const bootNotice = el("p", bootWarning);
+  bootNotice.id = "update-boot-warning";
+  activate.setAttribute("aria-describedby", bootNotice.id);
+  const activationActions = el("div", "", "form-actions");
+  activationActions.append(activate);
+  activationArea.append(bootNotice, activationActions);
+
+  const remove = el("button", "Remove all custom pages", "quiet");
+  remove.type = "button";
+  remove.id = "update-remove";
+  const inventory = el("ul");
+  inventory.id = "update-inventory";
+  const inventoryState = el("p");
+  inventoryState.id = "update-inventory-state";
+  inventoryState.setAttribute("role", "status");
+  const pager = el("div", "", "form-actions file-pager"),
+    position = el("p"),
+    previous = el("button", "Previous file", "quiet"),
+    next = el("button", "Next file", "quiet");
+  previous.type = next.type = "button";
+  pager.id = "update-pager";
+  pager.hidden = true;
+  pager.append(position, previous, next);
+  const clearActions = el("div", "", "form-actions file-clear");
+  clearActions.hidden = true;
+  clearActions.append(remove);
+  const installed = el("section", "", "installed-files");
+  installed.append(el("h2", "Installed files"), inventoryState, inventory, pager, clearActions);
+  container.dataset.updateState = "loading";
+  container.replaceChildren(help, warning, status, details, reloadActions, form);
+  if (firmware) {
+    const recovery = el("details"),
+      title = el("summary", "Serial recovery");
+    recovery.append(
+      title,
+      el(
+        "p",
+        "Disconnect the attached device’s TX/RX wires, connect the ESP to a USB UART adapter, and back up its flash. Flash with esptool using the images and addresses in your build’s release-manifest.json. Use the instructions for your flash layout; the wrong addresses can overwrite settings or radio data."
+      )
+    );
+    container.append(activationArea, recovery);
+  } else {
+    const intro = el(
+      "p",
+      "Host small web pages on this ESP, such as a sensor display or controls for an attached microcontroller. This is optional; the serial bridge works without it.",
+      "management-intro"
+    );
+    const setup = el("details", "", "custom-page-help");
+    setup.id = "custom-page-help";
+    const steps = el("ol");
+    for (const text of [
+      "Create your page content and any supporting JavaScript, CSS or image files.",
+      "Upload all the files together below.",
+      "Open an installed file to view it. For example, panel.html is served at /user/panel.html."
+    ])
+      steps.append(el("li", text));
+    const example = el("pre", '<h1>Sensor readings</h1>\n<p id="reading">Waiting for data…</p>');
+    const link = el("a", "ELClient custom-page examples (upstream)");
+    link.href = "https://github.com/jeelabs/esp-link/blob/master/WEB-SERVER.md";
+    link.target = "_blank";
+    link.rel = "noopener";
+    const links = el("p");
+    links.append(link);
+    const integration = el("a", "Microcontroller integration settings");
+    integration.href = "#/integrations";
+    const integrationLink = el("p");
+    integrationLink.append(integration);
+    setup.append(
+      el("summary", "How to create a custom web page"),
+      steps,
+      el("h3", "HTML files"),
+      el(
+        "p",
+        "ESP Serial2WiFi adds the opening HTML document, stylesheets and helper scripts to each .html file when you upload it. Write the content that goes inside the page; leave out <!doctype>, <html>, <head> and <body>. For example:"
+      ),
+      example,
+      el("h3", "Interactive controls and readings"),
+      el(
+        "p",
+        "The built-in helpers exchange messages with an attached microcontroller running ELClient or compatible firmware. That firmware supplies readings and handles button presses. It also needs Microcontroller integration enabled. Uploading a page alone does not connect it to the serial device."
+      ),
+      el(
+        "p",
+        "This uses ESP Serial2WiFi’s command protocol over SLIP, which separates messages on the serial connection. Ordinary serial devices do not understand these commands."
+      ),
+      integrationLink,
+      links
+    );
+    container.prepend(intro, setup, el("h2", "Upload files"));
+    container.append(installed);
+  }
+  function message(value, state) {
+    if (destroyed) return;
+    status.textContent = value;
+    if (state) container.dataset.updateState = state;
+  }
+  function setBusy(value) {
+    if (destroyed) return;
+    busy = value;
+    input.disabled =
+      expected.disabled =
+      confirmation.disabled =
+      reload.disabled =
+      remove.disabled =
+      previous.disabled =
+      next.disabled =
+        value;
+    activate.disabled = value;
+    updateControls();
+    container.dispatchEvent(
+      new CustomEvent("device-operation", {
+        bubbles: true,
+        detail: { busy: value, owner: operationOwner }
+      })
+    );
+  }
+  function updateControls() {
+    if (destroyed) return;
+    input.disabled = busy || !!activation || !info;
+    expected.disabled = busy || !!activation;
+    form.hidden = firmware && info && !info.ota_supported;
+    submit.disabled =
+      busy ||
+      !!activation ||
+      !files.length ||
+      stagedKey !== infoKey(info || {}) ||
+      !confirmation.checked ||
+      !info ||
+      (firmware && !info.ota_supported);
+    if (!firmware) {
+      pager.hidden = !info?.valid || !(info.index > 0 || info.next !== null);
+      clearActions.hidden = !info || (info.valid && !info.count);
+      previous.disabled = busy || !info || info.index === 0;
+      next.disabled = busy || !info || info.next === null;
+      remove.disabled = busy || !info;
+    }
+  }
+  function clearSelection() {
+    selected++;
+    files = [];
+    stagedKey = null;
+    accepted = null;
+    activate.hidden = true;
+    input.value = "";
+    confirmation.checked = false;
+    fileStatus.textContent = "No file selected.";
+  }
+  function showInfo(value) {
+    if (destroyed) return;
+    if (info && !activation && infoKey(info) !== infoKey(value) && (files.length || accepted)) {
+      clearSelection();
+      fileStatus.textContent = "Device information changed. Select the files again.";
+    }
+    info = value;
+    details.replaceChildren();
+    if (firmware) {
+      activationArea.hidden = !value.ota_supported;
+      if (value.external_ui)
+        help.textContent =
+          "Choose the .elu package for the target slot shown below. It includes the firmware and web interface. Upload it, then activate it to restart ESP Serial2WiFi. Keep your USB recovery backup.";
+      input.accept = value.external_ui ? ".elu" : ".bin";
+      label.firstChild.textContent = value.external_ui
+        ? "Firmware/UI update package"
+        : "Application image";
+      submit.textContent = value.external_ui
+        ? "Upload firmware and web interface"
+        : "Upload application image";
+    }
+
+    const rows = firmware
+      ? [
+          ["Version", value.version],
+          ["SDK", value.sdk],
+          ["Active slot", value.active_slot ?? "Unknown"],
+          ["Target slot", value.target_slot ?? "Unknown"],
+          ["Flash capacity", value.flash_bytes + " bytes"],
+          [
+            value.external_ui ? "Maximum update" : "Maximum image",
+            value.max_image_bytes + " bytes"
+          ],
+          ["OTA supported", value.ota_supported ? "Yes" : "No — " + (value.reason || "Unavailable")]
+        ]
+      : [
+          ["Capacity", value.capacity_bytes + " bytes"],
+          ["Used", value.used_bytes === null ? "Unknown" : value.used_bytes + " bytes"],
+          ["Files", value.count + (value.truncated ? " or more" : "")],
+          ["HTML wrapper overhead", value.html_prefix_bytes + " bytes per .html file"]
+        ];
+    for (const [label, value] of rows) details.append(el("dt", label), el("dd", String(value)));
+    if (!firmware) {
+      inventory.replaceChildren();
+      inventory.hidden = !value.valid || !value.files.length;
+      inventoryState.hidden = value.valid && !!value.count;
+      inventoryState.textContent = !value.valid
+        ? "Custom-page storage couldn’t be read. Upload files to replace it, or clear storage to start empty."
+        : "No custom pages installed.";
+      remove.textContent = value.valid ? "Remove all custom pages" : "Clear custom-page storage";
+      position.textContent =
+        "File " + (value.index + 1) + " of " + value.count + (value.truncated ? "+" : "");
+      for (const file of value.files) {
+        const li = el("li"),
+          link = el("a", file.name);
+        link.href = "/user/" + encodeURIComponent(file.name);
+        link.target = "_blank";
+        link.rel = "noopener";
+        li.append(link, el("span", " — " + file.bytes.toLocaleString() + " bytes"));
+        inventory.append(li);
+      }
+    }
+    updateControls();
+  }
+  async function refresh(index = 0) {
+    if (destroyed || busy || flight) return flight;
+    controller?.abort();
+    const signal = (controller = new AbortController()).signal;
+    flight = api
+      .request(path + (index ? "/" + index : ""), { signal, retries: 0, validate })
+      .then((value) => {
+        if (destroyed || signal.aborted) return;
+        showInfo(value);
+        message(
+          firmware && !value.ota_supported
+            ? (value.reason || "OTA unavailable") +
+                ". See Serial recovery below for USB flashing instructions."
+            : "Device information loaded.",
+          "ready"
+        );
+      })
+      .catch(() => {
+        if (!destroyed && !signal.aborted)
+          message(
+            "Device information is unavailable. Check connectivity and use Reload device information.",
+            "unavailable"
+          );
+      })
+      .finally(() => {
+        flight = null;
+      });
+    return flight;
+  }
+  input.addEventListener("change", async () => {
+    const generation = ++selected;
+    files = [];
+    accepted = null;
+    activation = null;
+    activate.hidden = true;
+    confirmation.checked = false;
+    updateControls();
+    const proposed = [...input.files],
+      checkedInfo = info;
+    if (!proposed.length) {
+      fileStatus.textContent = "No file selected.";
+      return;
+    }
+    try {
+      if (!info) throw new Error("Load device information before selecting files.");
+      if (firmware) {
+        if (!info.ota_supported) throw new Error(info.reason || "OTA is unavailable.");
+        if (proposed[0].size < 1024 || proposed[0].size > info.max_image_bytes)
+          throw new Error(
+            "Choose a firmware file between 1024 and " +
+              info.max_image_bytes.toLocaleString() +
+              " bytes."
+          );
+        checkFirmware(new Uint8Array(await proposed[0].arrayBuffer()), info);
+      } else checkPages(proposed, info);
+      if (destroyed || generation !== selected) return;
+      if (infoKey(checkedInfo) !== infoKey(info))
+        throw new Error("Device information changed. Select the files again.");
+      stagedKey = infoKey(info);
+      files = proposed;
+      fileStatus.textContent =
+        proposed.map((f) => f.name + " (" + f.size.toLocaleString() + " bytes)").join(", ") +
+        (firmware
+          ? ". Header and layout checks passed; the device validates the full image."
+          : ". Capacity and filename checks passed.");
+    } catch (error) {
+      if (generation === selected) fileStatus.textContent = error.message;
+    }
+    updateControls();
+  });
+  expected.addEventListener("input", () => {
+    if (accepted && !activation) accepted.version = expected.value.trim();
+  });
+  confirmation.addEventListener("change", updateControls);
+  reload.addEventListener("click", () => refresh(info?.index || 0));
+  previous.addEventListener("click", () => refresh(Math.max(0, info.index - 1)));
+  next.addEventListener("click", () => refresh(info.next));
+  async function verifyPages(proposed, signal) {
+    const first = await api.request(path, { signal, retries: 0, validate: validPages });
+    if (!first.valid || first.count !== proposed.length || first.truncated)
+      throw new Error("Inventory count could not be verified.");
+    const byName = new Map(proposed.map((f) => [f.name, f]));
+    let page = first;
+    for (let i = 0; i < proposed.length; i++) {
+      if (i) page = await api.request(path + "/" + i, { signal, retries: 0, validate: validPages });
+      const stored = page.files[0],
+        file = stored && byName.get(stored.name);
+      if (!file) throw new Error("Stored filenames differ from the selection.");
+      const prefix = file.name.endsWith(".html") ? first.html_prefix_bytes : 0;
+      const actual = await api.request("/user/" + encodeURIComponent(file.name), {
+          signal,
+          retries: 0,
+          timeout: 120000,
+          responseType: "bytes"
+        }),
+        wanted = new Uint8Array(await file.arrayBuffer());
+      if (
+        actual.length !== wanted.length + prefix ||
+        stored.bytes !== actual.length ||
+        wanted.some((b, n) => b !== actual[n + prefix])
+      )
+        throw new Error("Stored file content could not be verified.");
+      byName.delete(stored.name);
+    }
+    showInfo(first);
+  }
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (submit.disabled) return;
+    const proposed = [...files];
+    controller?.abort();
+    const signal = (controller = new AbortController()).signal;
+    setBusy(true);
+    progress.hidden = false;
+    progress.value = 0;
+    transfer.textContent = "Transferring…";
+    accepted = null;
+    activation = null;
+    activate.hidden = true;
+    try {
+      let body;
+      if (firmware) body = proposed[0];
+      else {
+        body = new FormData();
+        for (const file of proposed) body.append("webpage", file, file.name);
+      }
+      await api.request(path + "/upload", {
+        method: "POST",
+        body,
+        signal,
+        retries: 0,
+        timeout: 180000,
+        responseType: "text",
+        onUploadProgress: ({ loaded, total }) => {
+          if (destroyed) return;
+          if (total) {
+            progress.value = loaded / total;
+            transfer.textContent =
+              "Uploading: " + Math.floor((100 * loaded) / total) + "% — checking the upload next.";
+          } else
+            transfer.textContent =
+              "Transferred " + loaded.toLocaleString() + " bytes; awaiting device response.";
+        }
+      });
+      if (destroyed || signal.aborted) return;
+      progress.value = 1;
+      transfer.textContent = "Transfer completed; device accepted the upload.";
+      if (firmware) {
+        accepted = {
+          before: info.active_slot,
+          target: info.target_slot,
+          version: expected.value.trim()
+        };
+        activate.hidden = false;
+        message(
+          "Upload checked and ready. Click Activate uploaded firmware to restart ESP Serial2WiFi with it.",
+          "uploaded"
+        );
+      } else {
+        message("Upload received. Checking the saved files…", "verifying");
+        await verifyPages(proposed, signal);
+        message("Custom pages uploaded and checked.", "verified");
+        files = [];
+        input.value = "";
+        confirmation.checked = false;
+        fileStatus.textContent = "No file selected.";
+      }
+    } catch (error) {
+      message(
+        error.ambiguous
+          ? "The connection closed during upload. Reload the device information before trying again. If ESP Serial2WiFi won’t boot, use Serial recovery."
+          : "The upload couldn’t be checked. Your files are still selected. Reload the device information before trying again.",
+        "unverified"
+      );
+    } finally {
+      if (!destroyed) setBusy(false);
+    }
+  });
+  activate.addEventListener("click", async () => {
+    if (
+      destroyed ||
+      activation ||
+      !accepted ||
+      busy ||
+      !confirm(
+        "Activate the uploaded firmware? ESP Serial2WiFi will restart and disconnect Wi-Fi/TCP.\n\n" +
+          bootWarning +
+          "\n\nNo automatic rollback is available."
+      )
+    )
+      return;
+    controller?.abort();
+    const signal = (controller = new AbortController()).signal;
+    setBusy(true);
+    activation = Object.freeze({ ...accepted, version: expected.value.trim() });
+    activate.hidden = true;
+    try {
+      await api.request("/api/v1/firmware/activate", {
+        method: "POST",
+        body: new URLSearchParams({ action: "activate_firmware" }),
+        signal,
+        retries: 0,
+        responseType: "text"
+      });
+      if (destroyed) return;
+      message(
+        "Activation requested. Keep this page open, reconnect to the recovery AP/network, then use Refresh device to verify the running slot/version.",
+        "awaiting-reconnect"
+      );
+    } catch (error) {
+      if (destroyed) return;
+      if (!error.ambiguous) {
+        activation = null;
+        activate.hidden = false;
+      }
+      message(
+        error.ambiguous
+          ? "The connection closed before ESP Serial2WiFi replied. Reconnect and check which firmware is running before trying again."
+          : "ESP Serial2WiFi couldn’t activate the new firmware. Reload the device information before trying again.",
+        "unverified"
+      );
+    } finally {
+      if (!destroyed) setBusy(false);
+    }
+  });
+  remove.addEventListener("click", async () => {
+    if (
+      busy ||
+      !info ||
+      !confirm(
+        "Clear custom-page storage and remove all installed files? Keep a backup; this cannot be undone."
+      )
+    )
+      return;
+    controller?.abort();
+    const signal = (controller = new AbortController()).signal;
+    setBusy(true);
+    try {
+      const value = await api.request("/api/v1/pages/clear", {
+        method: "POST",
+        body: new URLSearchParams({ action: "remove_all_pages" }),
+        signal,
+        retries: 0,
+        validate: validPages
+      });
+      const saved = await api.request(path, { signal, retries: 0, validate: validPages });
+      if (!value.valid || value.count || !saved.valid || saved.count)
+        throw new Error("Removal unverified");
+      showInfo(saved);
+      message("All custom pages removed.", "verified");
+    } catch (error) {
+      if (destroyed) return;
+      message(
+        error.ambiguous
+          ? "The connection closed before ESP Serial2WiFi replied. Reload the file list before trying again."
+          : "Couldn’t confirm the removal. Reload the file list to check.",
+        "unverified"
+      );
+    } finally {
+      if (!destroyed) setBusy(false);
+    }
+  });
+  const unload = (event) => {
+    if (busy || files.length || accepted) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+  };
+  window.addEventListener("beforeunload", unload);
+  updateControls();
+  refresh();
+  return {
+    refresh: () => refresh(info?.index || 0),
+    updateFailure(error, stopped) {
+      if (activation && stopped)
+        message(
+          "Couldn’t reconnect after the restart. Rejoin ESP Serial2WiFi’s Wi-Fi, then click Retry connection. If it won’t boot, restore your backup over USB.",
+          "unverified"
+        );
+    },
+    updateStatus(s) {
+      const changed =
+        previousStatus &&
+        (s.firmware.version !== previousStatus.firmware.version ||
+          s.firmware.slot !== previousStatus.firmware.slot ||
+          (s.system.uptime_ms !== null &&
+            previousStatus.system.uptime_ms !== null &&
+            s.system.uptime_ms < previousStatus.system.uptime_ms));
+      previousStatus = s;
+      if (!activation && firmware && info && changed) {
+        if (busy) controller?.abort();
+        clearSelection();
+        info = null;
+        message(
+          "Firmware changed. Reload device information before selecting an update.",
+          "unavailable"
+        );
+        updateControls();
+      }
+      if (activation) {
+        const outcome = bootOutcome(s, activation.before, activation.target, activation.version);
+        message(outcome.message, outcome.state);
+        if (outcome.state !== "waiting" && info)
+          showInfo({
+            ...info,
+            version: s.firmware.version,
+            sdk: s.firmware.sdk,
+            active_slot: activation.target,
+            target_slot: activation.before,
+            ota_supported: s.firmware.ota_eligible,
+            reason: s.firmware.ota_eligible ? null : "OTA unavailable on the running build"
+          });
+        if (outcome.state !== "waiting") {
+          activation = null;
+          clearSelection();
+          updateControls();
+        }
+      }
+    },
+    canLeave: () =>
+      !(busy || files.length || accepted) ||
+      confirm(
+        busy
+          ? "Leave during the upload? Keep this page open to see whether it finishes."
+          : "Leave this page and discard the selected files?"
+      ),
+    destroy() {
+      destroyed = true;
+      selected++;
+      controller?.abort();
+      files = [];
+      input.value = "";
+      window.removeEventListener("beforeunload", unload);
+      if (busy)
+        container.dispatchEvent(
+          new CustomEvent("device-operation", {
+            bubbles: true,
+            detail: { busy: false, owner: operationOwner }
+          })
+        );
+    }
+  };
 }

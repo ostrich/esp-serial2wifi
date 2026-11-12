@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Geometry checks plus actual flash write guards under ASan/UBSan."""
+
 import _paths
+from source_text import SourceText
 import copy
 import subprocess
 import tempfile
@@ -10,10 +12,10 @@ import flash_layout
 from flash_stubs import STUB
 
 ROOT = Path(__file__).resolve().parents[2]
-PRIVATE = ROOT / '.build-tests/layout'
+PRIVATE = ROOT / ".build-tests/layout"
 
 
-TEST = r'''
+TEST = r"""
 int main(void) {
  test_map=FLASH_LAYOUT_MAP;capacity=0;
  for(uint32_t n=FLASH_LAYOUT_BYTES;n>1;n>>=1)capacity++;
@@ -52,7 +54,7 @@ int main(void) {
  assert(!flashLayoutRegister());assert(registrations==1);
  assert(!flashRegionErase(FLASH_REGION_CONFIG,FLASH_CONFIG_START));
 }
-'''
+"""
 
 
 class LayoutTests(unittest.TestCase):
@@ -60,35 +62,57 @@ class LayoutTests(unittest.TestCase):
         for target in flash_layout.TARGETS:
             with self.subTest(target=target):
                 value = flash_layout.layout(target)
-                self.assertEqual(value['regions']['config'][0], 0x7a000 if target == '512KB' else 0x7e000)
-                self.assertEqual(value['regions']['params'][0], value['bytes'] - 0x3000)
-                for change in ('overlap', 'range', 'alignment'):
+                self.assertEqual(
+                    value["regions"]["config"][0], 0x7A000 if target == "512KB" else 0x7E000
+                )
+                self.assertEqual(value["regions"]["params"][0], value["bytes"] - 0x3000)
+                for change in ("overlap", "range", "alignment"):
                     bad = copy.deepcopy(value)
-                    bad['regions']['config'] = {'overlap': (0, 4096),
-                        'range': (value['bytes'], 4096), 'alignment': (1, 4096)}[change]
+                    bad["regions"]["config"] = {
+                        "overlap": (0, 4096),
+                        "range": (value["bytes"], 4096),
+                        "alignment": (1, 4096),
+                    }[change]
                     with self.assertRaises(ValueError):
                         flash_layout.validate(bad)
-        self.assertEqual(flash_layout.layout('2MB')['map'], 3)
+        self.assertEqual(flash_layout.layout("2MB")["map"], 3)
 
     def test_actual_write_guards(self):
         PRIVATE.mkdir(parents=True, exist_ok=True)
         for target in flash_layout.TARGETS:
             with self.subTest(target=target), tempfile.TemporaryDirectory(dir=PRIVATE) as name:
                 temp = Path(name)
-                (temp / 'esp8266.h').write_text(STUB)
-                (temp / 'generated_flash_layout.h').write_text(flash_layout.header(flash_layout.layout(target)))
-                (temp / 'test.c').write_text('#include "' + str(ROOT / 'src/core/flash_layout.c') + '"\n' + TEST)
-                subprocess.run(['gcc', '-std=c99', '-Wall', '-Wextra', '-Werror',
-                    '-Wno-misleading-indentation', '-fsanitize=address,undefined',
-                    '-I' + str(temp), str(temp / 'test.c'), '-o', str(temp / 'test')], check=True)
-                subprocess.run([str(temp / 'test')], check=True)
+                (temp / "esp8266.h").write_text(STUB)
+                (temp / "generated_flash_layout.h").write_text(
+                    flash_layout.header(flash_layout.layout(target))
+                )
+                (temp / "test.c").write_text(
+                    '#include "' + str(ROOT / "src/core/flash_layout.c") + '"\n' + TEST
+                )
+                subprocess.run(
+                    [
+                        "gcc",
+                        "-std=c99",
+                        "-Wall",
+                        "-Wextra",
+                        "-Werror",
+                        "-Wno-misleading-indentation",
+                        "-fsanitize=address,undefined",
+                        "-I" + str(temp),
+                        str(temp / "test.c"),
+                        "-o",
+                        str(temp / "test"),
+                    ],
+                    check=True,
+                )
+                subprocess.run([str(temp / "test")], check=True)
 
     def test_actual_custom_page_writer(self):
-        source = (ROOT / 'src/core/cgiwebserversetup.c').read_text()
-        start = source.index('int ICACHE_FLASH_ATTR webServerSetupWriteFlash')
-        end = source.index('// multipart callback', start)
+        source = SourceText((ROOT / "src/core/cgiwebserversetup.c").read_text())
+        start = source.index("int ICACHE_FLASH_ATTR webServerSetupWriteFlash")
+        end = source.index("// multipart callback", start)
         writer = source[start:end]
-        code = r'''
+        code = r"""
 int main(void) {
  test_map=FLASH_LAYOUT_MAP;capacity=0;
  for(uint32_t n=FLASH_LAYOUT_BYTES;n>1;n>>=1)capacity++;
@@ -107,18 +131,35 @@ int main(void) {
  assert(writes==oldwrites&&erases==olderases);
  assert(memory[FLASH_CONFIG_START]==255&&memory[FLASH_PARAMS_START]==255);
 }
-'''
+"""
         PRIVATE.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(dir=PRIVATE) as name:
             temp = Path(name)
-            (temp / 'esp8266.h').write_text(STUB)
-            (temp / 'generated_flash_layout.h').write_text(flash_layout.header(flash_layout.layout('4MB')))
-            (temp / 'test.c').write_text('#include "' + str(ROOT / 'src/core/flash_layout.c') + '"\n' + writer + code)
-            subprocess.run(['gcc', '-std=c99', '-Wall', '-Wextra', '-Werror',
-                '-Wno-misleading-indentation', '-fsanitize=address,undefined',
-                '-I' + str(temp), str(temp / 'test.c'), '-o', str(temp / 'test')], check=True)
-            subprocess.run([str(temp / 'test')], check=True)
+            (temp / "esp8266.h").write_text(STUB)
+            (temp / "generated_flash_layout.h").write_text(
+                flash_layout.header(flash_layout.layout("4MB"))
+            )
+            (temp / "test.c").write_text(
+                '#include "' + str(ROOT / "src/core/flash_layout.c") + '"\n' + writer + code
+            )
+            subprocess.run(
+                [
+                    "gcc",
+                    "-std=c99",
+                    "-Wall",
+                    "-Wextra",
+                    "-Werror",
+                    "-Wno-misleading-indentation",
+                    "-fsanitize=address,undefined",
+                    "-I" + str(temp),
+                    str(temp / "test.c"),
+                    "-o",
+                    str(temp / "test"),
+                ],
+                check=True,
+            )
+            subprocess.run([str(temp / "test")], check=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """Actual Optiboot receive state machine; no ESP emulation or target hardware."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
-import os,subprocess,sys
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'.build-tests/optiboot-protocol';OUT.mkdir(parents=True,exist_ok=True)
-s=(Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'src/core/cgioptiboot.c').read_text()
-globals=s[s.index('static enum {'):s.index('#define MAX_SAVED')]
-receive=s[s.index('// skip in-sync responses'):]
-source=r'''
+import os, subprocess, sys
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / ".build-tests/optiboot-protocol"
+OUT.mkdir(parents=True, exist_ok=True)
+s = SourceText(
+    (Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "src/core/cgioptiboot.c").read_text()
+)
+globals = s[s.index("static enum {") : s.index("#define MAX_SAVED")]
+receive = s[s.index("// skip in-sync responses") :]
+source = (
+    r"""
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -22,12 +30,16 @@ source=r'''
 #define RESP_SZ 64
 #define PGM_INTERVAL 200
 char responseBuf[RESP_SZ],errMessage[128];short responseLen;
-'''+globals+r'''
+"""
+    + globals
+    + r"""
 static unsigned sent,resets;
 static void uart0_write_char(char c){(void)c;sent++;}
 static void armTimer(uint32_t ms){assert(ms==PGM_INTERVAL);}
 static void optibootInit(void){resets++;progState=stateInit;responseLen=0;errMessage[0]=0;}
-'''+receive+r'''
+"""
+    + receive
+    + r"""
 static void feed(const unsigned char *p,unsigned n){optibootUartRecv((char*)p,n);}
 int main(int argc,char **argv){
  (void)argv;
@@ -45,7 +57,30 @@ rejected:
  assert(skipInSync(repeated,31)==1&&repeated[0]==7);
  puts("PASS actual Optiboot receive states: split packets, zero minor version, binary signature, page ACKs, rejected target and overlapping prefix removal");
 }
-'''
-(OUT/'test.c').write_text(source)
-subprocess.run(['cc','-std=c11','-g','-O1','-Wall','-Wextra','-Werror','-Wno-unused-variable','-funsigned-char','-fsanitize=address,undefined','-I'+str(ROOT/'src/core'),str(OUT/'test.c'),'-o',str(OUT/'test')],check=True)
-subprocess.run([str(OUT/'test')]+sys.argv[2:],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
+"""
+)
+(OUT / "test.c").write_text(source)
+subprocess.run(
+    [
+        "cc",
+        "-std=c11",
+        "-g",
+        "-O1",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-unused-variable",
+        "-funsigned-char",
+        "-fsanitize=address,undefined",
+        "-I" + str(ROOT / "src/core"),
+        str(OUT / "test.c"),
+        "-o",
+        str(OUT / "test"),
+    ],
+    check=True,
+)
+subprocess.run(
+    [str(OUT / "test")] + sys.argv[2:],
+    check=True,
+    env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"},
+)

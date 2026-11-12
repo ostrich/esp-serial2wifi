@@ -10,7 +10,5 @@
 extern void call_user_start(void) __attribute__((noreturn));
 
 // Must remain in IRAM: this is the image entry, before SDK initialization.
-void __attribute__((noreturn)) call_user_start1(void) {
-  call_user_start();
-}
+void __attribute__((noreturn)) call_user_start1(void) { call_user_start(); }
 #endif

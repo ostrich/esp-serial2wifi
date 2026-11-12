@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 """Actual Optiboot page sender against a deterministic STK500 flash peer."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
-import os,re,subprocess
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'.build-tests/optiboot-readback';OUT.mkdir(parents=True,exist_ok=True)
-s=(ROOT/'src/core/cgioptiboot.c').read_text();functions=s[s.index('// Poll UART for ACKs'):s.index('//===== Rebooting and getting sync')]
-h=(ROOT/'src/core/pgmshared.h').read_text();record=re.search(r'extern struct optibootData \{.*?\} \*optibootData;',h,re.S).group()
-source=r'''
+import os, re, subprocess
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / ".build-tests/optiboot-readback"
+OUT.mkdir(parents=True, exist_ok=True)
+s = SourceText((ROOT / "src/core/cgioptiboot.c").read_text())
+functions = s[s.index("// Poll UART for ACKs") : s.index("//===== Rebooting and getting sync")]
+h = SourceText((ROOT / "src/core/pgmshared.h").read_text())
+record = re.search(r"extern struct optibootData \{.*?\} \*optibootData;", h, re.S).group()
+source = (
+    r"""
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -22,7 +30,9 @@ source=r'''
 #define os_strcpy strcpy
 #define PGM_TIMEOUT 20000
 typedef struct {int unused;} HttpdConnData;
-'''+record+r'''
+"""
+    + record
+    + r"""
 struct optibootData *optibootData;
 static struct optibootData state;
 static char page[768],errMessage[128];
@@ -49,7 +59,9 @@ static uint16_t uart0_rx_poll(char *out,uint16_t need,uint32_t timeout){
  pollTimeout=timeout;unsigned available=replyEnd-replyStart;if(available>need)available=need;
  memcpy(out,reply+replyStart,available);replyStart+=available;return available;
 }
-'''+functions+r'''
+"""
+    + functions
+    + r"""
 static void setup(bool verify,unsigned problem){
  memset(&state,0,sizeof state);memset(flash,0xff,sizeof flash);for(unsigned i=0;i<sizeof page;i++)page[i]=i;
  optibootData=&state;state.pageBuf=page;state.pageLen=256;state.pgmSz=128;
@@ -70,7 +82,26 @@ int main(void){
  setup(false,0);ackWait=2;add(STK_INSYNC);add(STK_OK);add(STK_INSYNC);add(0);assert(!pollAck());
  puts("PASS actual Optiboot page wire protocol: independent flash bytes/readback, mismatch/truncation/ACK errors, legacy mode, bounded baud timeout and application/alignment guards");
 }
-'''
-(OUT/'test.c').write_text(source)
-subprocess.run(['cc','-std=c11','-g','-O1','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-I'+str(ROOT/'src/core'),str(OUT/'test.c'),'-o',str(OUT/'test')],check=True)
-subprocess.run([str(OUT/'test')],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
+"""
+)
+(OUT / "test.c").write_text(source)
+subprocess.run(
+    [
+        "cc",
+        "-std=c11",
+        "-g",
+        "-O1",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fsanitize=address,undefined",
+        "-I" + str(ROOT / "src/core"),
+        str(OUT / "test.c"),
+        "-o",
+        str(OUT / "test"),
+    ],
+    check=True,
+)
+subprocess.run(
+    [str(OUT / "test")], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"}
+)

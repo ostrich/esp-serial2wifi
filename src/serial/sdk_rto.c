@@ -93,31 +93,38 @@ static struct tcp_pcb *ICACHE_FLASH_ATTR find_pcb(struct espconn *conn) {
 int ICACHE_FLASH_ATTR sdk_tx_sequence(struct espconn *conn, uint32_t *sequence) {
   struct tcp_pcb *p = find_pcb(conn);
   espconn_msg *message;
-  if (!p || !p->callback_arg) return 0;
+  if (!p || !p->callback_arg)
+    return 0;
   message = p->callback_arg;
-  if (message->pespconn != conn || message->pcommon.pcb != p) return 0;
+  if (message->pespconn != conn || message->pcommon.pcb != p)
+    return 0;
   *sequence = p->snd_lbb;
   return 1;
 }
-static int ICACHE_FLASH_ATTR overlaps(const void *a, unsigned length,
-                                    const void *b, unsigned size) {
+static int ICACHE_FLASH_ATTR overlaps(const void *a, unsigned length, const void *b,
+                                      unsigned size) {
   uintptr_t x = (uintptr_t)a, y = (uintptr_t)b;
-  if (!length || !size) return 0;
+  if (!length || !size)
+    return 0;
   return x >= y ? x - y < size : y - x < length;
 }
-int ICACHE_FLASH_ATTR sdk_tx_copy_complete(struct espconn *conn, const void *data,
-                                         uint16_t length, uint32_t end_sequence) {
+int ICACHE_FLASH_ATTR sdk_tx_copy_complete(struct espconn *conn, const void *data, uint16_t length,
+                                           uint32_t end_sequence) {
   struct tcp_pcb *p = find_pcb(conn);
   espconn_msg *message;
   espconn_buf *record;
   struct tcp_seg *segment;
   unsigned n = 0, q;
-  if (!p || !p->callback_arg || (int32_t)(p->snd_lbb - end_sequence) < 0) return 0;
+  if (!p || !p->callback_arg || (int32_t)(p->snd_lbb - end_sequence) < 0)
+    return 0;
   message = p->callback_arg;
-  if (message->pespconn != conn || message->pcommon.pcb != p) return 0;
+  if (message->pespconn != conn || message->pcommon.pcb != p)
+    return 0;
   for (record = message->pcommon.pbuf; record; record = record->pnext) {
-    if (++n > 8) return 0;
-    if (record->unsent && overlaps(record->payload, record->len, data, length)) return 0;
+    if (++n > 8)
+      return 0;
+    if (record->unsent && overlaps(record->payload, record->len, data, length))
+      return 0;
   }
   /* Verify actual TCP ownership, rather than relying on the COPY option's
    * confusing name or on completion notifications that carry no record ID. */
@@ -126,9 +133,11 @@ int ICACHE_FLASH_ATTR sdk_tx_copy_complete(struct espconn *conn, const void *dat
     for (segment = q ? p->unacked : p->unsent; segment; segment = segment->next) {
       struct pbuf *buffer;
       unsigned count = 0;
-      if (++n > 16 || !segment->p) return 0;
+      if (++n > 16 || !segment->p)
+        return 0;
       for (buffer = segment->p; buffer; buffer = buffer->next) {
-        if (++count > 16 || overlaps(buffer->payload, buffer->len, data, length)) return 0;
+        if (++count > 16 || overlaps(buffer->payload, buffer->len, data, length))
+          return 0;
       }
     }
   }

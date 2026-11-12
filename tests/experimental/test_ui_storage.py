@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Exercise actual banked OTA/storage code with real packages and flash faults."""
+
 import _paths
 from pathlib import Path
-import subprocess,tempfile,hashlib
+import subprocess, tempfile, hashlib
 from flash_stubs import STUB, HTTP, SDK
-ROOT=Path(__file__).resolve().parents[2]
-TEST=r'''
+
+ROOT = Path(__file__).resolve().parents[2]
+TEST = r"""
 void (*programmingCB)(char *,short);
 int serbridgeInMCUFlashing(void){return 0;}
 bool serialInputPending(void){return false;}
@@ -53,15 +55,81 @@ int main(int argc,char **argv){assert(argc==3);unsigned n[2];uint8_t *data[2]={l
  assert(active_upload);test_free(active_upload);active_upload=NULL;c.cgiPrivData=NULL;verified_slot=-1;operationOwner=NULL;cgiRebootFirmware(&c);assert(c.code==409&&!scheduled);protected(1);current_slot=1;assert(!uiStorageMount());
  reset();begin(&c,&p,data[1],n[1]);cgiUploadFirmware(&c);current_slot=1;p.buff=(char *)data[1]+1024;p.received=2048;cgiUploadFirmware(&c);assert(c.code==409&&!writes&&!erases);abort_upload(&c);
  free(data[0]);free(data[1]);puts("PASS SHA-256, matched banks/both slots, interruption, protected data, malformed/corrupt packages, write faults, OOM and activation guards");}
-'''
-out=ROOT/'.build-tests/ui-storage';out.mkdir(parents=True,exist_ok=True)
+"""
+out = ROOT / ".build-tests/ui-storage"
+out.mkdir(parents=True, exist_ok=True)
 with tempfile.TemporaryDirectory(dir=out) as temporary:
- work=Path(temporary);(work/'esp8266.h').write_text(STUB.replace('if(fail_read)return 1;', 'assert(!(a&3)&&!(n&3)&&!((uintptr_t)p&3));if(fail_read)return 1;')+SDK+'\n#define os_memset memset\n#define os_malloc test_alloc\n#define os_strcmp strcmp\n#define os_strncmp strncmp\n#define os_strcpy strcpy\n#define os_printf printf\n')
- (work/'httpd.h').write_text(HTTP);(work/'cgi.h').write_text('#include "httpd.h"\nvoid errorResponse(HttpdConnData *,int,char *);\n');(work/'cgiflash.h').write_text('')
- (work/'generated_flash_layout.h').write_text((ROOT/'build/generated_flash_layout.h').read_text())
- assert '#define FLASH_EXTERNAL_UI 1' in (work/'generated_flash_layout.h').read_text(),'Build SERIAL2WIFI_EXTERNAL_UI=1 first'
- (work/'ui_identity.h').write_bytes((ROOT/'build/ui_identity.h').read_bytes())
- sources=(ROOT/'src/espfs/espfs.c').read_text()+'\n'+'\n'.join((ROOT/'src/core'/name).read_text() for name in ('operation.c','flash_layout.c','asset_digest.c','ui_storage.c','firmware_image.c','cgiflash.c'))
- (work/'test.c').write_text('#define SERIAL2WIFI_OTA_ENABLED 1\n#include <esp8266.h>\n'+sources+'\n'+TEST)
- binary=work/'test';subprocess.run(['cc','-D__ets__','-std=c99','-g','-O1','-fsanitize=address,undefined','-Wall','-Wextra','-Werror','-Wno-unused-function','-Wno-int-to-pointer-cast','-Wno-pointer-to-int-cast','-Wno-misleading-indentation','-I'+str(work),'-I'+str(ROOT/'src/core'),'-I'+str(ROOT/'src/espfs'),'-I'+str(ROOT/'src/serial'),'-I'+str(ROOT/'tests/support/api-stubs'),str(work/'test.c'),'-o',str(binary)],check=True)
- subprocess.run([str(binary),str(ROOT/'firmware/update-user1.elu'),str(ROOT/'firmware/update-user2.elu')],check=True)
+    work = Path(temporary)
+    (work / "esp8266.h").write_text(
+        STUB.replace(
+            "if(fail_read)return 1;",
+            "assert(!(a&3)&&!(n&3)&&!((uintptr_t)p&3));if(fail_read)return 1;",
+        )
+        + SDK
+        + "\n#define os_memset memset\n#define os_malloc test_alloc\n#define os_strcmp strcmp\n#define os_strncmp strncmp\n#define os_strcpy strcpy\n#define os_printf printf\n"
+    )
+    (work / "httpd.h").write_text(HTTP)
+    (work / "cgi.h").write_text(
+        '#include "httpd.h"\nvoid errorResponse(HttpdConnData *,int,char *);\n'
+    )
+    (work / "cgiflash.h").write_text("")
+    (work / "generated_flash_layout.h").write_text(
+        (ROOT / "build/generated_flash_layout.h").read_text()
+    )
+    assert "#define FLASH_EXTERNAL_UI 1" in (work / "generated_flash_layout.h").read_text(), (
+        "Build SERIAL2WIFI_EXTERNAL_UI=1 first"
+    )
+    (work / "ui_identity.h").write_bytes((ROOT / "build/ui_identity.h").read_bytes())
+    sources = (
+        (ROOT / "src/espfs/espfs.c").read_text()
+        + "\n"
+        + "\n".join(
+            (ROOT / "src/core" / name).read_text()
+            for name in (
+                "operation.c",
+                "flash_layout.c",
+                "asset_digest.c",
+                "ui_storage.c",
+                "firmware_image.c",
+                "cgiflash.c",
+            )
+        )
+    )
+    (work / "test.c").write_text(
+        "#define SERIAL2WIFI_OTA_ENABLED 1\n#include <esp8266.h>\n" + sources + "\n" + TEST
+    )
+    binary = work / "test"
+    subprocess.run(
+        [
+            "cc",
+            "-D__ets__",
+            "-std=c99",
+            "-g",
+            "-O1",
+            "-fsanitize=address,undefined",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-Wno-unused-function",
+            "-Wno-int-to-pointer-cast",
+            "-Wno-pointer-to-int-cast",
+            "-Wno-misleading-indentation",
+            "-I" + str(work),
+            "-I" + str(ROOT / "src/core"),
+            "-I" + str(ROOT / "src/espfs"),
+            "-I" + str(ROOT / "src/serial"),
+            "-I" + str(ROOT / "tests/support/api-stubs"),
+            str(work / "test.c"),
+            "-o",
+            str(binary),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            str(binary),
+            str(ROOT / "firmware/update-user1.elu"),
+            str(ROOT / "firmware/update-user2.elu"),
+        ],
+        check=True,
+    )

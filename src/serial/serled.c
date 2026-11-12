@@ -8,18 +8,17 @@ static ETSTimer serledTimer;
 
 static void ICACHE_FLASH_ATTR setSerled(int on) {
   int8_t pin = flashConfig.ser_led_pin;
-  if (pin < 0) return; // disabled
+  if (pin < 0)
+    return; // disabled
   // LED is active-low
   if (on) {
-    gpio_output_set(0, (1<<pin), (1<<pin), 0);
+    gpio_output_set(0, (1 << pin), (1 << pin), 0);
   } else {
-    gpio_output_set((1<<pin), 0, (1<<pin), 0);
+    gpio_output_set((1 << pin), 0, (1 << pin), 0);
   }
 }
 
-static void ICACHE_FLASH_ATTR serledTimerCb(void *v) {
-  setSerled(0);
-}
+static void ICACHE_FLASH_ATTR serledTimerCb(void *v) { setSerled(0); }
 
 void ICACHE_FLASH_ATTR serledFlash(int duration) {
   setSerled(1);
@@ -32,7 +31,7 @@ void ICACHE_FLASH_ATTR serledInit(void) {
   int8_t pin = flashConfig.ser_led_pin;
   if (pin >= 0) {
     makeGpio(pin);
-    gpio_output_set(0, 0, (1<<pin), 0);
+    gpio_output_set(0, 0, (1 << pin), 0);
     serledFlash(1000); // turn it on for 1 second
   }
 #ifdef SERLED_DBG
@@ -73,13 +72,13 @@ void ICACHE_FLASH_ATTR makeGpio(uint8_t pin) {
   case 9:
   case 10:
   case 11:
-    addr = PERIPHS_IO_MUX_SD_CMD_U - 4 * (11-pin);
+    addr = PERIPHS_IO_MUX_SD_CMD_U - 4 * (11 - pin);
     break;
   case 12:
   case 13:
   case 14:
   case 15:
-    addr = PERIPHS_IO_MUX_MTDO_U - 4 * (15-pin);
+    addr = PERIPHS_IO_MUX_MTDO_U - 4 * (15 - pin);
     break;
   default:
     return;

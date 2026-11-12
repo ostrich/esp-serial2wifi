@@ -34,8 +34,11 @@ Some flash handling cgi routines. Used for reading the existing flash and updati
 // Normal OTA is limited to the hardware-tested SDK3 4MB layout.
 // Other layouts require an explicit test build; physical geometry is checked below.
 static char *ICACHE_FLASH_ATTR otaError(void) {
-  if (!FLASH_LAYOUT_OTA_CAPABLE) return "Wi-Fi updates are not supported on this flash layout";
-  if (!SERIAL2WIFI_OTA_TESTING && !(SERIAL2WIFI_OTA_ENABLED && FLASH_LAYOUT_MAP == 4 && FLASH_LAYOUT_BYTES == 4194304U)) return "Wi-Fi updates are disabled in this firmware";
+  if (!FLASH_LAYOUT_OTA_CAPABLE)
+    return "Wi-Fi updates are not supported on this flash layout";
+  if (!SERIAL2WIFI_OTA_TESTING &&
+      !(SERIAL2WIFI_OTA_ENABLED && FLASH_LAYOUT_MAP == 4 && FLASH_LAYOUT_BYTES == 4194304U))
+    return "Wi-Fi updates are disabled in this firmware";
   if (system_get_flash_size_map() != FLASH_LAYOUT_MAP || flashPhysicalSize() != FLASH_LAYOUT_BYTES)
     return "Flash geometry mismatch";
   return NULL;
@@ -64,39 +67,49 @@ static bool activating;
 static ETSTimer flash_reboot_timer;
 #define UPLOAD_REJECTED ((void *)1)
 
-static void ICACHE_FLASH_ATTR releaseUpload(HttpdConnData *connData, Upload *upload, bool invalidate) {
+static void
+    ICACHE_FLASH_ATTR releaseUpload(HttpdConnData *connData, Upload *upload, bool invalidate) {
   if (upload && (void *)upload != UPLOAD_REJECTED) {
 #if FLASH_EXTERNAL_UI
-    if(invalidate&&upload->ui_touched)flashRegionErase(upload->slot?FLASH_REGION_UI2:FLASH_REGION_UI1,upload->slot?FLASH_UI2_START:FLASH_UI1_START);
+    if (invalidate && upload->ui_touched)
+      flashRegionErase(upload->slot ? FLASH_REGION_UI2 : FLASH_REGION_UI1,
+                       upload->slot ? FLASH_UI2_START : FLASH_UI1_START);
 #endif
-    if (invalidate && upload->touched) flashRegionErase(upload->region, upload->address);
-    if (active_upload == upload) active_upload = NULL;
+    if (invalidate && upload->touched)
+      flashRegionErase(upload->region, upload->address);
+    if (active_upload == upload)
+      active_upload = NULL;
     os_free(upload);
   }
   deviceOperationEnd(connData);
   connData->cgiPrivData = NULL;
 }
 
-static int ICACHE_FLASH_ATTR uploadError(HttpdConnData *connData, Upload *upload, int code, char *message) {
+static int ICACHE_FLASH_ATTR uploadError(HttpdConnData *connData, Upload *upload, int code,
+                                         char *message) {
   releaseUpload(connData, upload, true);
   connData->cgiPrivData = UPLOAD_REJECTED;
   errorResponse(connData, code, message);
   return HTTPD_CGI_DONE;
 }
 
-
-
 int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
   Upload *upload = connData->cgiPrivData;
-  if (!connData->conn) { releaseUpload(connData, upload, true); return HTTPD_CGI_DONE; }
-  if ((void *)upload == UPLOAD_REJECTED) return HTTPD_CGI_DONE;
-  if(activating)return uploadError(connData,upload,409,"Firmware activation is pending");
-  if(!upload&&!apiWrite(connData))return HTTPD_CGI_DONE;
+  if (!connData->conn) {
+    releaseUpload(connData, upload, true);
+    return HTTPD_CGI_DONE;
+  }
+  if ((void *)upload == UPLOAD_REJECTED)
+    return HTTPD_CGI_DONE;
+  if (activating)
+    return uploadError(connData, upload, 409, "Firmware activation is pending");
+  if (!upload && !apiWrite(connData))
+    return HTTPD_CGI_DONE;
   char *error = otaError();
-  if (error) return uploadError(connData, upload, 400, error);
-  if (!connData->post || connData->requestType != HTTPD_METHOD_POST ||
-      !connData->post->buff || connData->post->buffLen <= 0 ||
-      connData->post->received < connData->post->buffLen)
+  if (error)
+    return uploadError(connData, upload, 400, error);
+  if (!connData->post || connData->requestType != HTTPD_METHOD_POST || !connData->post->buff ||
+      connData->post->buffLen <= 0 || connData->post->received < connData->post->buffLen)
     return uploadError(connData, upload, 400, "Invalid upload request");
   uint32_t count = connData->post->buffLen;
   uint32_t received = connData->post->received;
@@ -106,23 +119,30 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
       (received != total && count != 1024))
     return uploadError(connData, upload, 400, "Invalid upload chunk geometry");
   if (!upload) {
-    if (offset != 0) return uploadError(connData, NULL, 400, "Missing upload start");
-    if(active_upload||programmingCB||serbridgeInMCUFlashing()||serialInputPending()||serbridge_client_count()||!deviceOperationBegin(connData))
-      return uploadError(connData,NULL,409,"Another device operation is active");
+    if (offset != 0)
+      return uploadError(connData, NULL, 400, "Missing upload start");
+    if (active_upload || programmingCB || serbridgeInMCUFlashing() || serialInputPending() ||
+        serbridge_client_count() || !deviceOperationBegin(connData))
+      return uploadError(connData, NULL, 409, "Another device operation is active");
     uint8 current = system_upgrade_userbin_check();
-    if (current > 1) return uploadError(connData, NULL, 409, "Unknown active slot");
+    if (current > 1)
+      return uploadError(connData, NULL, 409, "Unknown active slot");
     verified_slot = -1;
     upload = os_zalloc(sizeof(*upload));
-    if (!upload) return uploadError(connData, NULL, 503, "Not enough memory for upload");
+    if (!upload)
+      return uploadError(connData, NULL, 503, "Not enough memory for upload");
     upload->slot = 1 - current;
     upload->region = upload->slot == 0 ? FLASH_REGION_APP1 : FLASH_REGION_APP2;
     upload->address = upload->slot == 0 ? FLASH_APP1_START : FLASH_APP2_START;
 #if FLASH_EXTERNAL_UI
     uint32_t app_length;
-    if(count!=1024||!uiStorageHeader((uint8_t *)connData->post->buff,total,upload->slot,&app_length,&upload->ui_length))
-      return uploadError(connData,upload,400,"Choose a complete firmware/UI update package for this slot");
-    upload->total=total;upload->ui_offset=1024+((app_length+1023)&~1023U);
-    os_memcpy(upload->ui_digest,connData->post->buff+20,32);
+    if (count != 1024 || !uiStorageHeader((uint8_t *)connData->post->buff, total, upload->slot,
+                                          &app_length, &upload->ui_length))
+      return uploadError(connData, upload, 400,
+                         "Choose a complete firmware/UI update package for this slot");
+    upload->total = total;
+    upload->ui_offset = 1024 + ((app_length + 1023) & ~1023U);
+    os_memcpy(upload->ui_digest, connData->post->buff + 20, 32);
     if (!firmwareImageInit(&upload->image, app_length, upload->slot))
 #else
     if (!firmwareImageInit(&upload->image, total, upload->slot))
@@ -191,14 +211,16 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
     return uploadError(connData, upload, 409, "Upload state or slot changed");
   if (!firmwareImageFeed(&upload->image, (uint8_t *)connData->post->buff, count) ||
       (received == total && !firmwareImageFinish(&upload->image)))
-    return uploadError(connData, upload, 400, "Image header, SDK/layout identity or checksum is invalid");
+    return uploadError(connData, upload, 400,
+                       "Image header, SDK/layout identity or checksum is invalid");
   uint32_t address = upload->address + offset;
   upload->touched = true;
   if ((address % SPI_FLASH_SEC_SIZE == 0 && !flashRegionErase(upload->region, address)) ||
       !flashRegionWrite(upload->region, address, connData->post->buff, count))
     return uploadError(connData, upload, 500, "Flash erase/write verification failed");
   upload->written += count;
-  if (received != total) return HTTPD_CGI_MORE;
+  if (received != total)
+    return HTTPD_CGI_MORE;
 #endif
   verified_slot = upload->slot;
   releaseUpload(connData, upload, false);
@@ -209,16 +231,27 @@ int ICACHE_FLASH_ATTR cgiUploadFirmware(HttpdConnData *connData) {
 }
 
 int ICACHE_FLASH_ATTR cgiRebootFirmware(HttpdConnData *connData) {
-  if (!connData->conn) return HTTPD_CGI_DONE;
-  if(!apiWrite(connData))return HTTPD_CGI_DONE;
+  if (!connData->conn)
+    return HTTPD_CGI_DONE;
+  if (!apiWrite(connData))
+    return HTTPD_CGI_DONE;
   char *error = otaError();
-  if (error) { errorResponse(connData, 400, error); return HTTPD_CGI_DONE; }
-  if (activating||active_upload || verified_slot < 0 || system_upgrade_userbin_check() != 1 - verified_slot) {
-    errorResponse(connData, 409, "No complete verified upload in this boot; upload again or recover serially");
+  if (error) {
+    errorResponse(connData, 400, error);
     return HTTPD_CGI_DONE;
   }
-  if(programmingCB||serbridgeInMCUFlashing()||serialInputPending()||serbridge_client_count()||!deviceOperationBegin(&flash_reboot_timer)) {errorResponse(connData,409,"Another device operation is active");return HTTPD_CGI_DONE;}
-  activating=true;
+  if (activating || active_upload || verified_slot < 0 ||
+      system_upgrade_userbin_check() != 1 - verified_slot) {
+    errorResponse(connData, 409,
+                  "No complete verified upload in this boot; upload again or recover serially");
+    return HTTPD_CGI_DONE;
+  }
+  if (programmingCB || serbridgeInMCUFlashing() || serialInputPending() ||
+      serbridge_client_count() || !deviceOperationBegin(&flash_reboot_timer)) {
+    errorResponse(connData, 409, "Another device operation is active");
+    return HTTPD_CGI_DONE;
+  }
+  activating = true;
   httpdStartResponse(connData, 200);
   httpdHeader(connData, "Content-Length", "0");
   httpdEndHeaders(connData);

@@ -26,7 +26,7 @@ int ets_memcmp(const void *s1, const void *s2, size_t n);
 void *ets_memcpy(void *dest, const void *src, size_t n);
 void *ets_memmove(void *dest, const void *src, size_t n);
 void *ets_memset(void *s, int c, size_t n);
-int ets_sprintf(char *str, const char *format, ...)  __attribute__ ((format (printf, 2, 3)));
+int ets_sprintf(char *str, const char *format, ...) __attribute__((format(printf, 2, 3)));
 int ets_str2macaddr(void *, void *);
 int ets_strcmp(const char *s1, const char *s2);
 char *ets_strcpy(char *dest, const char *src);
@@ -48,17 +48,18 @@ void ets_update_cpu_frequency(int freqmhz);
 #endif
 
 int ets_vsprintf(char *str, const char *format, va_list argptr);
-int ets_vsnprintf(char *buffer, size_t sizeOfBuffer,  const char *format, va_list argptr);
-int os_snprintf(char *str, size_t size, const char *format, ...) __attribute__((format(printf, 3, 4)));
-int os_printf_plus(const char *format, ...)  __attribute__((format(printf, 1, 2)));
+int ets_vsnprintf(char *buffer, size_t sizeOfBuffer, const char *format, va_list argptr);
+int os_snprintf(char *str, size_t size, const char *format, ...)
+    __attribute__((format(printf, 3, 4)));
+int os_printf_plus(const char *format, ...) __attribute__((format(printf, 1, 2)));
 
 #undef os_printf
-#define os_printf(format, ...) do {                                           \
-    system_set_os_print(true);                                                \
-    os_printf_plus(format, ## __VA_ARGS__);                                   \
-    system_set_os_print(DEBUG_SDK);                                           \
+#define os_printf(format, ...)                                                                     \
+  do {                                                                                             \
+    system_set_os_print(true);                                                                     \
+    os_printf_plus(format, ##__VA_ARGS__);                                                         \
+    system_set_os_print(DEBUG_SDK);                                                                \
   } while (0)
-
 
 // memory allocation functions are "different" due to memory debugging functionality
 // added in SDK 1.4.0
@@ -81,12 +82,12 @@ void ets_bzero(void *s, size_t n);
 
 // This is not missing in SDK 1.1.0 but causes a parens error
 #undef PIN_FUNC_SELECT
-#define PIN_FUNC_SELECT(PIN_NAME, FUNC)  do { \
-    WRITE_PERI_REG(PIN_NAME,   \
-        (READ_PERI_REG(PIN_NAME) & ~(PERIPHS_IO_MUX_FUNC<<PERIPHS_IO_MUX_FUNC_S))  \
-            |( (((FUNC&BIT2)<<2)|(FUNC&0x3))<<PERIPHS_IO_MUX_FUNC_S) );  \
-    } while (0)
-
+#define PIN_FUNC_SELECT(PIN_NAME, FUNC)                                                            \
+  do {                                                                                             \
+    WRITE_PERI_REG(PIN_NAME,                                                                       \
+                   (READ_PERI_REG(PIN_NAME) & ~(PERIPHS_IO_MUX_FUNC << PERIPHS_IO_MUX_FUNC_S)) |   \
+                       ((((FUNC & BIT2) << 2) | (FUNC & 0x3)) << PERIPHS_IO_MUX_FUNC_S));          \
+  } while (0)
 
 // Shortcuts for memory functions
 //#define os_malloc   pvPortMalloc // defined in SDK 1.4.0 onwards

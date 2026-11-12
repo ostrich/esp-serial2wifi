@@ -3,6 +3,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 uint32_t apNetworkAddress(void);
-bool apNetworkConfigure(uint32_t address,bool persist);
+bool apNetworkConfigure(uint32_t address, bool persist);
 void apNetworkInit(void);
 #endif

@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
 """Execute pinned SDK write-admission and ACK-credit code with both capacities."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
 import subprocess, argparse
-root=Path(__file__).resolve().parents[2]
-parser=argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--sdk',type=Path,required=True)
-args=parser.parse_args()
-b=root/'.build-tests/sdk-credit'
-b.mkdir(parents=True,exist_ok=True)
-sdk=args.sdk/'third_party/lwip/core'
-s=(sdk/'tcp_out.c').read_text(encoding='latin1');start=s.index('static err_t ICACHE_FLASH_ATTR\ntcp_write_checks(')
-i=s.index('{',start)+1;depth=1
+
+root = Path(__file__).resolve().parents[2]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--sdk", type=Path, required=True)
+args = parser.parse_args()
+b = root / ".build-tests/sdk-credit"
+b.mkdir(parents=True, exist_ok=True)
+sdk = args.sdk / "third_party/lwip/core"
+s = SourceText((sdk / "tcp_out.c").read_text(encoding="latin1"))
+start = s.index("static err_t ICACHE_FLASH_ATTR\ntcp_write_checks(")
+i = s.index("{", start) + 1
+depth = 1
 while depth:
- depth+=(s[i]=='{')-(s[i]=='}');i+=1
-check=s[start:i]
-s=(sdk/'tcp_in.c').read_text(encoding='latin1');start=s.index('      pcb->acked = (u16_t)(ackno - pcb->lastack);');end=s.index('pcb->snd_buf += pcb->acked;',start)+len('pcb->snd_buf += pcb->acked;');ack=s[start:end]
-prefix=r'''
+    depth += (s[i] == "{") - (s[i] == "}")
+    i += 1
+check = s[start:i]
+s = SourceText((sdk / "tcp_in.c").read_text(encoding="latin1"))
+start = s.index("      pcb->acked = (u16_t)(ackno - pcb->lastack);")
+end = s.index("pcb->snd_buf += pcb->acked;", start) + len("pcb->snd_buf += pcb->acked;")
+ack = s[start:end]
+prefix = r"""
 #include <stdint.h>
 #include <assert.h>
 #include <stdio.h>
@@ -36,8 +45,8 @@ typedef int err_t;typedef uint16_t u16_t;
 #define ERR_MEM -1
 #define TF_NAGLEMEMERR 128
 struct tcp_pcb {unsigned state,flags,snd_buf,snd_queuelen,lastack,acked;void *unacked,*unsent;};
-'''
-tests=r'''
+"""
+tests = r"""
 }
 int main(void) {
  for(unsigned cap=1072;cap<=2144;cap+=1072) {
@@ -56,7 +65,30 @@ int main(void) {
  assert(tcp_write_checks(&p,536)==ERR_CONN);
  puts("PASS original eight-pbuf and closed-connection guards retained");
 }
-'''
-(b/'credit-native.c').write_text(prefix+check+'\nstatic void ack_credit(struct tcp_pcb *pcb,unsigned ackno) {\n'+ack+tests,encoding='latin1')
-subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-fsanitize=address,undefined',str(b/'credit-native.c'),'-o',str(b/'credit-native')],check=True)
-r=subprocess.run([str(b/'credit-native')],capture_output=True,text=True);(b/'credit-native.log').write_text(r.stdout+r.stderr);print(r.stdout,end='');r.check_returncode()
+"""
+(b / "credit-native.c").write_text(
+    prefix
+    + check
+    + "\nstatic void ack_credit(struct tcp_pcb *pcb,unsigned ackno) {\n"
+    + ack
+    + tests,
+    encoding="latin1",
+)
+subprocess.run(
+    [
+        "cc",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fsanitize=address,undefined",
+        str(b / "credit-native.c"),
+        "-o",
+        str(b / "credit-native"),
+    ],
+    check=True,
+)
+r = subprocess.run([str(b / "credit-native")], capture_output=True, text=True)
+(b / "credit-native.log").write_text(r.stdout + r.stderr)
+print(r.stdout, end="")
+r.check_returncode()

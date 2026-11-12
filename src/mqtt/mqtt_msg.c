@@ -41,8 +41,7 @@ enum mqtt_connect_flag {
   MQTT_CONNECT_FLAG_CLEAN_SESSION = 1 << 1
 };
 
-struct
-  __attribute__((__packed__)) mqtt_connect_variable_header {
+struct __attribute__((__packed__)) mqtt_connect_variable_header {
   uint8_t lengthMsb;
   uint8_t lengthLsb;
 #if defined(PROTOCOL_NAMEv31)
@@ -58,8 +57,8 @@ struct
   uint8_t keepaliveLsb;
 };
 
-static int ICACHE_FLASH_ATTR
-append_string(mqtt_connection_t* connection, const char* string, int len) {
+static int ICACHE_FLASH_ATTR append_string(mqtt_connection_t *connection, const char *string,
+                                           int len) {
   if (connection->message.length + len + 2 > connection->buffer_length)
     return -1;
 
@@ -71,8 +70,8 @@ append_string(mqtt_connection_t* connection, const char* string, int len) {
   return len + 2;
 }
 
-static uint16_t ICACHE_FLASH_ATTR
-append_message_id(mqtt_connection_t* connection, uint16_t message_id) {
+static uint16_t ICACHE_FLASH_ATTR append_message_id(mqtt_connection_t *connection,
+                                                    uint16_t message_id) {
   // If message_id is zero then we should assign one, otherwise
   // we'll use the one supplied by the caller
   while (message_id == 0)
@@ -87,32 +86,31 @@ append_message_id(mqtt_connection_t* connection, uint16_t message_id) {
   return message_id;
 }
 
-static int ICACHE_FLASH_ATTR
-init_message(mqtt_connection_t* connection) {
+static int ICACHE_FLASH_ATTR init_message(mqtt_connection_t *connection) {
   connection->message.length = MQTT_MAX_FIXED_HEADER_SIZE;
   return MQTT_MAX_FIXED_HEADER_SIZE;
 }
 
-static mqtt_message_t* ICACHE_FLASH_ATTR
-fail_message(mqtt_connection_t* connection) {
+static mqtt_message_t *ICACHE_FLASH_ATTR fail_message(mqtt_connection_t *connection) {
   connection->message.data = connection->buffer;
   connection->message.length = 0;
   return &connection->message;
 }
 
-static mqtt_message_t* ICACHE_FLASH_ATTR
-fini_message(mqtt_connection_t* connection, int type, int dup, int qos, int retain) {
+static mqtt_message_t *ICACHE_FLASH_ATTR fini_message(mqtt_connection_t *connection, int type,
+                                                      int dup, int qos, int retain) {
   int remaining_length = connection->message.length - MQTT_MAX_FIXED_HEADER_SIZE;
 
   if (remaining_length > 127) {
-    connection->buffer[0] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
+    connection->buffer[0] =
+        ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
     connection->buffer[1] = 0x80 | (remaining_length % 128);
     connection->buffer[2] = remaining_length / 128;
     connection->message.length = remaining_length + 3;
     connection->message.data = connection->buffer;
-  }
-  else {
-    connection->buffer[1] = ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
+  } else {
+    connection->buffer[1] =
+        ((type & 0x0f) << 4) | ((dup & 1) << 3) | ((qos & 3) << 1) | (retain & 1);
     connection->buffer[2] = remaining_length;
     connection->message.length = remaining_length + 2;
     connection->message.data = connection->buffer + 1;
@@ -121,62 +119,97 @@ fini_message(mqtt_connection_t* connection, int type, int dup, int qos, int reta
   return &connection->message;
 }
 
-void ICACHE_FLASH_ATTR
-mqtt_msg_init(mqtt_connection_t* connection, uint8_t* buffer, uint16_t buffer_length) {
+void ICACHE_FLASH_ATTR mqtt_msg_init(mqtt_connection_t *connection, uint8_t *buffer,
+                                     uint16_t buffer_length) {
   memset(connection, 0, sizeof(*connection));
   connection->buffer = buffer;
   connection->buffer_length = buffer_length;
 }
 
 // Zero means incomplete fixed header; -1 means invalid. At most four length bytes.
-static int ICACHE_FLASH_ATTR mqtt_header(const uint8_t *p,uint16_t length,unsigned *header) {
-  if(length<2)return 0;uint32_t total=0;
-  for(unsigned i=1;i<=4;i++) {
-    if(i>=length)return 0;total|=(uint32_t)(p[i]&127)<<(7*(i-1));
-    if(!(p[i]&128)){*header=i+1;return total+i+1;}
+static int ICACHE_FLASH_ATTR mqtt_header(const uint8_t *p, uint16_t length, unsigned *header) {
+  if (length < 2)
+    return 0;
+  uint32_t total = 0;
+  for (unsigned i = 1; i <= 4; i++) {
+    if (i >= length)
+      return 0;
+    total |= (uint32_t)(p[i] & 127) << (7 * (i - 1));
+    if (!(p[i] & 128)) {
+      *header = i + 1;
+      return total + i + 1;
+    }
   }
   return -1;
 }
-int ICACHE_FLASH_ATTR mqtt_get_total_length(const uint8_t *p,uint16_t length) {
-  unsigned header;return mqtt_header(p,length,&header);
+int ICACHE_FLASH_ATTR mqtt_get_total_length(const uint8_t *p, uint16_t length) {
+  unsigned header;
+  return mqtt_header(p, length, &header);
 }
-const char *ICACHE_FLASH_ATTR mqtt_get_publish_topic(const uint8_t *p,uint16_t *length) {
-  unsigned head;int total=mqtt_header(p,*length,&head);
-  if(total<=0||total>*length||head+2>(unsigned)total)goto invalid;
-  unsigned n=(unsigned)p[head]<<8|p[head+1];head+=2;
-  if(!n||n>(unsigned)total-head)goto invalid;
-  *length=n;return (const char*)p+head;
-invalid:*length=0;return NULL;
+const char *ICACHE_FLASH_ATTR mqtt_get_publish_topic(const uint8_t *p, uint16_t *length) {
+  unsigned head;
+  int total = mqtt_header(p, *length, &head);
+  if (total <= 0 || total > *length || head + 2 > (unsigned)total)
+    goto invalid;
+  unsigned n = (unsigned)p[head] << 8 | p[head + 1];
+  head += 2;
+  if (!n || n > (unsigned)total - head)
+    goto invalid;
+  *length = n;
+  return (const char *)p + head;
+invalid:
+  *length = 0;
+  return NULL;
 }
-const char *ICACHE_FLASH_ATTR mqtt_get_publish_data(const uint8_t *p,uint16_t *length) {
-  unsigned head;int total=mqtt_header(p,*length,&head);
-  if(total<=0||total>*length||head+2>(unsigned)total)goto invalid;
-  unsigned n=(unsigned)p[head]<<8|p[head+1];head+=2;
-  if(!n||n>(unsigned)total-head)goto invalid;head+=n;
-  if(mqtt_get_qos(p)){if(head+2>(unsigned)total)goto invalid;head+=2;}
-  *length=total-head;return (const char*)p+head;
-invalid:*length=0;return NULL;
-}
-uint16_t ICACHE_FLASH_ATTR mqtt_get_id(const uint8_t *p,uint16_t length) {
-  unsigned head;int total=mqtt_header(p,length,&head);if(total<=0||total>length)return 0;
-  if(mqtt_get_type(p)==MQTT_MSG_TYPE_PUBLISH) {
-    if(!mqtt_get_qos(p)||head+2>(unsigned)total)return 0;
-    unsigned n=(unsigned)p[head]<<8|p[head+1];head+=2;
-    if(!n||n>(unsigned)total-head)return 0;head+=n;
+const char *ICACHE_FLASH_ATTR mqtt_get_publish_data(const uint8_t *p, uint16_t *length) {
+  unsigned head;
+  int total = mqtt_header(p, *length, &head);
+  if (total <= 0 || total > *length || head + 2 > (unsigned)total)
+    goto invalid;
+  unsigned n = (unsigned)p[head] << 8 | p[head + 1];
+  head += 2;
+  if (!n || n > (unsigned)total - head)
+    goto invalid;
+  head += n;
+  if (mqtt_get_qos(p)) {
+    if (head + 2 > (unsigned)total)
+      goto invalid;
+    head += 2;
   }
-  if(head+2>(unsigned)total)return 0;return (unsigned)p[head]<<8|p[head+1];
+  *length = total - head;
+  return (const char *)p + head;
+invalid:
+  *length = 0;
+  return NULL;
+}
+uint16_t ICACHE_FLASH_ATTR mqtt_get_id(const uint8_t *p, uint16_t length) {
+  unsigned head;
+  int total = mqtt_header(p, length, &head);
+  if (total <= 0 || total > length)
+    return 0;
+  if (mqtt_get_type(p) == MQTT_MSG_TYPE_PUBLISH) {
+    if (!mqtt_get_qos(p) || head + 2 > (unsigned)total)
+      return 0;
+    unsigned n = (unsigned)p[head] << 8 | p[head + 1];
+    head += 2;
+    if (!n || n > (unsigned)total - head)
+      return 0;
+    head += n;
+  }
+  if (head + 2 > (unsigned)total)
+    return 0;
+  return (unsigned)p[head] << 8 | p[head + 1];
 }
 
-
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info) {
-  struct mqtt_connect_variable_header* variable_header;
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_connect(mqtt_connection_t *connection,
+                                                   mqtt_connect_info_t *info) {
+  struct mqtt_connect_variable_header *variable_header;
 
   init_message(connection);
 
   if (connection->message.length + sizeof(*variable_header) > connection->buffer_length)
     return fail_message(connection);
-  variable_header = (void*)(connection->buffer + connection->message.length);
+  variable_header = (void *)(connection->buffer + connection->message.length);
   connection->message.length += sizeof(*variable_header);
 
   variable_header->lengthMsb = 0;
@@ -202,8 +235,7 @@ mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info) {
   if (info->client_id != NULL && info->client_id[0] != '\0') {
     if (append_string(connection, info->client_id, strlen(info->client_id)) < 0)
       return fail_message(connection);
-  }
-  else
+  } else
     return fail_message(connection);
 
   if (info->will_topic != NULL && info->will_topic[0] != '\0') {
@@ -236,8 +268,9 @@ mqtt_msg_connect(mqtt_connection_t* connection, mqtt_connect_info_t* info) {
   return fini_message(connection, MQTT_MSG_TYPE_CONNECT, 0, 0, 0);
 }
 
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* data, int data_length, int qos, int retain, uint16_t* message_id) {
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_publish(mqtt_connection_t *connection, const char *topic,
+                                                   const char *data, int data_length, int qos,
+                                                   int retain, uint16_t *message_id) {
   init_message(connection);
 
   if (topic == NULL || topic[0] == '\0')
@@ -249,8 +282,7 @@ mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* d
   if (qos > 0) {
     if ((*message_id = append_message_id(connection, 0)) == 0)
       return fail_message(connection);
-  }
-  else
+  } else
     *message_id = 0;
 
   if (connection->message.length + data_length > connection->buffer_length)
@@ -261,40 +293,41 @@ mqtt_msg_publish(mqtt_connection_t* connection, const char* topic, const char* d
   return fini_message(connection, MQTT_MSG_TYPE_PUBLISH, 0, qos, retain);
 }
 
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_puback(mqtt_connection_t* connection, uint16_t message_id) {
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_puback(mqtt_connection_t *connection,
+                                                  uint16_t message_id) {
   init_message(connection);
   if (append_message_id(connection, message_id) == 0)
     return fail_message(connection);
   return fini_message(connection, MQTT_MSG_TYPE_PUBACK, 0, 0, 0);
 }
 
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_pubrec(mqtt_connection_t* connection, uint16_t message_id) {
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_pubrec(mqtt_connection_t *connection,
+                                                  uint16_t message_id) {
   init_message(connection);
   if (append_message_id(connection, message_id) == 0)
     return fail_message(connection);
   return fini_message(connection, MQTT_MSG_TYPE_PUBREC, 0, 0, 0);
 }
 
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_pubrel(mqtt_connection_t* connection, uint16_t message_id) {
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_pubrel(mqtt_connection_t *connection,
+                                                  uint16_t message_id) {
   init_message(connection);
   if (append_message_id(connection, message_id) == 0)
     return fail_message(connection);
   return fini_message(connection, MQTT_MSG_TYPE_PUBREL, 0, 1, 0);
 }
 
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_pubcomp(mqtt_connection_t* connection, uint16_t message_id) {
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_pubcomp(mqtt_connection_t *connection,
+                                                   uint16_t message_id) {
   init_message(connection);
   if (append_message_id(connection, message_id) == 0)
     return fail_message(connection);
   return fini_message(connection, MQTT_MSG_TYPE_PUBCOMP, 0, 0, 0);
 }
 
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_subscribe(mqtt_connection_t* connection, const char* topic, int qos, uint16_t* message_id) {
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_subscribe(mqtt_connection_t *connection,
+                                                     const char *topic, int qos,
+                                                     uint16_t *message_id) {
   init_message(connection);
 
   if (topic == NULL || topic[0] == '\0')
@@ -313,8 +346,8 @@ mqtt_msg_subscribe(mqtt_connection_t* connection, const char* topic, int qos, ui
   return fini_message(connection, MQTT_MSG_TYPE_SUBSCRIBE, 0, 1, 0);
 }
 
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_unsubscribe(mqtt_connection_t* connection, const char* topic, uint16_t* message_id) {
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_unsubscribe(mqtt_connection_t *connection,
+                                                       const char *topic, uint16_t *message_id) {
   init_message(connection);
 
   if (topic == NULL || topic[0] == '\0')
@@ -329,20 +362,17 @@ mqtt_msg_unsubscribe(mqtt_connection_t* connection, const char* topic, uint16_t*
   return fini_message(connection, MQTT_MSG_TYPE_UNSUBSCRIBE, 0, 1, 0);
 }
 
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_pingreq(mqtt_connection_t* connection) {
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_pingreq(mqtt_connection_t *connection) {
   init_message(connection);
   return fini_message(connection, MQTT_MSG_TYPE_PINGREQ, 0, 0, 0);
 }
 
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_pingresp(mqtt_connection_t* connection) {
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_pingresp(mqtt_connection_t *connection) {
   init_message(connection);
   return fini_message(connection, MQTT_MSG_TYPE_PINGRESP, 0, 0, 0);
 }
 
-mqtt_message_t* ICACHE_FLASH_ATTR
-mqtt_msg_disconnect(mqtt_connection_t* connection) {
+mqtt_message_t *ICACHE_FLASH_ATTR mqtt_msg_disconnect(mqtt_connection_t *connection) {
   init_message(connection);
   return fini_message(connection, MQTT_MSG_TYPE_DISCONNECT, 0, 0, 0);
 }

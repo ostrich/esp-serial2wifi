@@ -1,45 +1,78 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <link rel="icon" href="/favicon.ico?v=serial2wifi" type="image/x-icon">
-  <title>ESP Serial2WiFi · Device overview</title>
-  <link rel="stylesheet" href="style.css">
-  <script type="module" src="app.js"></script>
-</head>
-<body>
-  <a class="skip" href="#main">Skip to content</a>
-  <header class="topbar">
-    <a class="brand" href="#/dashboard" aria-label="ESP Serial2WiFi dashboard">ESP<span>Serial2WiFi</span></a>
-    <div class="identity"><strong id="device-name">ESP Serial2WiFi</strong><span id="device-address">Address unavailable</span></div>
-    <span id="connection" class="status" data-state="unknown">○ Checking device</span>
-    <button id="theme" class="quiet" type="button" aria-label="Use dark theme">◐ <span>Theme</span></button>
-    <button id="menu" class="quiet" type="button" aria-controls="navigation" aria-expanded="false">☰ Menu</button>
-  </header>
-  <div class="workspace">
-    <nav id="navigation" aria-label="Main navigation" hidden>
-      <a href="#/dashboard" data-route="dashboard" aria-current="page">Dashboard</a>
-      <a href="#/network" data-route="network">Network</a>
-      <a href="#/serial" data-route="serial">Serial &amp; MCU</a>
-      <a href="#/integrations" data-route="integrations" data-feature="integrations" hidden>Integrations</a>
-      <a href="#/diagnostics" data-route="diagnostics">Diagnostics</a>
-      <a href="#/settings" data-route="settings">Device settings</a>
-      <a href="#/firmware" data-route="firmware">Firmware</a>
-      <a href="#/pages" data-route="pages" data-feature="custom_pages" hidden>Custom web pages</a>
-    </nav>
-    <main id="main" tabindex="-1" aria-labelledby="title">
-      <div class="page-content">
-      <div class="page-heading"><h1 id="title">Device overview</h1><button id="refresh" class="quiet" type="button" data-label="Refresh device"><span>Refresh device</span></button></div>
-      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
-      <div id="error" class="notice" data-kind="error" role="status" hidden><p id="error-message"></p><button id="retry" type="button">Retry connection</button></div>
-      <div id="cap-error" class="notice" data-kind="error" role="status" hidden><p id="cap-error-message"></p><button id="retry-features" type="button">Retry features</button></div>
-      <div id="view" aria-busy="true"></div>
-      <p class="refresh-time" id="updated">No device response yet.</p>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <link rel="icon" href="/favicon.ico?v=serial2wifi" type="image/x-icon" />
+    <title>ESP Serial2WiFi · Device overview</title>
+    <link rel="stylesheet" href="style.css" />
+    <script type="module" src="app.js"></script>
+  </head>
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="topbar">
+      <a class="brand" href="#/dashboard" aria-label="ESP Serial2WiFi dashboard"
+        >ESP<span>Serial2WiFi</span></a
+      >
+      <div class="identity">
+        <strong id="device-name">ESP Serial2WiFi</strong
+        ><span id="device-address">Address unavailable</span>
       </div>
-    </main>
-  </div>
-  <noscript><p class="notice">Enable JavaScript to configure ESP Serial2WiFi in this browser. You can still use a TCP client for the serial console.</p></noscript>
-</body>
+      <span id="connection" class="status" data-state="unknown">○ Checking device</span>
+      <button id="theme" class="quiet" type="button" aria-label="Use dark theme">
+        ◐ <span>Theme</span>
+      </button>
+      <button
+        id="menu"
+        class="quiet"
+        type="button"
+        aria-controls="navigation"
+        aria-expanded="false"
+      >
+        ☰ Menu
+      </button>
+    </header>
+    <div class="workspace">
+      <nav id="navigation" aria-label="Main navigation" hidden>
+        <a href="#/dashboard" data-route="dashboard" aria-current="page">Dashboard</a>
+        <a href="#/network" data-route="network">Network</a>
+        <a href="#/serial" data-route="serial">Serial &amp; MCU</a>
+        <a href="#/integrations" data-route="integrations" data-feature="integrations" hidden
+          >Integrations</a
+        >
+        <a href="#/diagnostics" data-route="diagnostics">Diagnostics</a>
+        <a href="#/settings" data-route="settings">Device settings</a>
+        <a href="#/firmware" data-route="firmware">Firmware</a>
+        <a href="#/pages" data-route="pages" data-feature="custom_pages" hidden>Custom web pages</a>
+      </nav>
+      <main id="main" tabindex="-1" aria-labelledby="title">
+        <div class="page-content">
+          <div class="page-heading">
+            <h1 id="title">Device overview</h1>
+            <button id="refresh" class="quiet" type="button" data-label="Refresh device">
+              <span>Refresh device</span>
+            </button>
+          </div>
+          <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+          <div id="error" class="notice" data-kind="error" role="status" hidden>
+            <p id="error-message"></p>
+            <button id="retry" type="button">Retry connection</button>
+          </div>
+          <div id="cap-error" class="notice" data-kind="error" role="status" hidden>
+            <p id="cap-error-message"></p>
+            <button id="retry-features" type="button">Retry features</button>
+          </div>
+          <div id="view" aria-busy="true"></div>
+          <p class="refresh-time" id="updated">No device response yet.</p>
+        </div>
+      </main>
+    </div>
+    <noscript
+      ><p class="notice">
+        Enable JavaScript to configure ESP Serial2WiFi in this browser. You can still use a TCP
+        client for the serial console.
+      </p></noscript
+    >
+  </body>
 </html>

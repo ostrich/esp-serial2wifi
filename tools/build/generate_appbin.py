@@ -226,13 +226,9 @@ def gen_appbin():
         # irom0.text.bin
         combine_bin(irom0text_bin_name, flash_bin_name, 0x0, 0)
     if boot_mode == "1":
-        data_bin = struct.pack(
-            "<BBBBI", BIN_MAGIC_FLASH, 3, 0, app, int(entry_addr, 16)
-        )
+        data_bin = struct.pack("<BBBBI", BIN_MAGIC_FLASH, 3, 0, app, int(entry_addr, 16))
     else:
-        data_bin = struct.pack(
-            "<BBBBI", BIN_MAGIC_FLASH, 3, byte2, byte3, int(entry_addr, 16)
-        )
+        data_bin = struct.pack("<BBBBI", BIN_MAGIC_FLASH, 3, byte2, byte3, int(entry_addr, 16))
     sum_size = len(data_bin)
     write_file(flash_bin_name, data_bin)
 

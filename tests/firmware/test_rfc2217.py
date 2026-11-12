@@ -1,13 +1,27 @@
 #!/usr/bin/env python3
 """Actual Telnet UART settings parser with fragmented/interleaved clients."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
-import os,subprocess,shutil,socket,pty,select,termios,threading,time,struct
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'.build-tests/rfc2217';OUT.mkdir(parents=True,exist_ok=True)
-s=(ROOT/'src/serial/serbridge.c').read_text();functions=s[s.index('#define IAC'):s.index('static bool ICACHE_FLASH_ATTR\nholdUartInput(')]
-cleanup=s[s.index('static void ICACHE_FLASH_ATTR\nserbridgeDisconCb('):s.index('// Connection reset callback')]
-functions+='\nstatic void releaseTxQueue(serbridgeConnData *c){(void)c;}\nstatic void sdk_rto_detach(struct espconn *c){(void)c;}\n'+cleanup
-source=r'''
+import os, subprocess, shutil, socket, pty, select, termios, threading, time, struct
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / ".build-tests/rfc2217"
+OUT.mkdir(parents=True, exist_ok=True)
+s = SourceText((ROOT / "src/serial/serbridge.c").read_text())
+functions = s[s.index("#define IAC") : s.index("static bool ICACHE_FLASH_ATTR\nholdUartInput(")]
+cleanup = s[
+    s.index("static void ICACHE_FLASH_ATTR\nserbridgeDisconCb(") : s.index(
+        "// Connection reset callback"
+    )
+]
+functions += (
+    "\nstatic void releaseTxQueue(serbridgeConnData *c){(void)c;}\nstatic void sdk_rto_detach(struct espconn *c){(void)c;}\n"
+    + cleanup
+)
+source = (
+    r"""
 #include <assert.h>
 #include <esp8266.h>
 #include "serbridge.h"
@@ -31,7 +45,9 @@ bool configSave(void){writes++;return !failSave;}
 void uart0_config(uint8_t b,uint8_t p,uint8_t s){registerBits=CALC_UARTMODE(b,p,s);formats++;}
 void uart0_baud(int n){baudCalls++;lastBaud=n;}
 void uart0_write_char(char c){assert(rawUsed<sizeof raw);raw[rawUsed++]=c;}
-'''+functions+r'''
+"""
+    + functions
+    + r"""
 static unsigned packet(unsigned char *out,unsigned command,const unsigned char *data,unsigned n){
  unsigned used=0;out[used++]=IAC;out[used++]=SB;out[used++]=44;out[used++]=command;
  for(unsigned i=0;i<n;i++){out[used++]=data[i];if(data[i]==IAC)out[used++]=IAC;}
@@ -104,63 +120,134 @@ int main(int argc,char **argv){
  assert(telnetUnwrap(&probe,pending,sizeof pending)==3&&probe.tx_failed&&!rawUsed);failResponse=false;
  puts("PASS actual RFC2217 UART settings: server101–104 replies, escaped baud bytes, fragmented/interleaved clients, live Odd/stop/data changes, queries/invalid values and persistence rollback");
 }
-'''
-(OUT/'test.c').write_text(source)
-subprocess.run(['cc','-std=c11','-g','-O1','-Wall','-Wextra','-Werror','-funsigned-char','-Wno-ignored-qualifiers','-Wno-misleading-indentation','-fsanitize=address,undefined',
- *['-I'+str(ROOT/p) for p in ['tests/support/api-stubs','src/core','src/serial','include']],str(OUT/'test.c'),'-o',str(OUT/'test')],check=True)
-subprocess.run([str(OUT/'test')],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
+"""
+)
+(OUT / "test.c").write_text(source)
+subprocess.run(
+    [
+        "cc",
+        "-std=c11",
+        "-g",
+        "-O1",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-funsigned-char",
+        "-Wno-ignored-qualifiers",
+        "-Wno-misleading-indentation",
+        "-fsanitize=address,undefined",
+        *[
+            "-I" + str(ROOT / p)
+            for p in ["tests/support/api-stubs", "src/core", "src/serial", "include"]
+        ],
+        str(OUT / "test.c"),
+        "-o",
+        str(OUT / "test"),
+    ],
+    check=True,
+)
+subprocess.run(
+    [str(OUT / "test")], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"}
+)
 
 # Exercise the production parser against the installed stock client in a real PTY.
 # No device connection or serial traffic: a loopback socket feeds the C parser.
-if shutil.which('telnet'):
+if shutil.which("telnet"):
     # A negative test port requests normal Telnet negotiation on an ephemeral port.
-    listener=socket.socket();listener.bind(('127.0.0.1',0));listener.listen()
-    master,slave=pty.openpty();captured=bytearray();negotiation=[];errors=[];stop=threading.Event()
-    worker=subprocess.Popen([str(OUT/'test'),'--bridge'],stdin=subprocess.PIPE,stdout=subprocess.PIPE)
+    listener = socket.socket()
+    listener.bind(("127.0.0.1", 0))
+    listener.listen()
+    master, slave = pty.openpty()
+    captured = bytearray()
+    negotiation = []
+    errors = []
+    stop = threading.Event()
+    worker = subprocess.Popen(
+        [str(OUT / "test"), "--bridge"], stdin=subprocess.PIPE, stdout=subprocess.PIPE
+    )
+
     def exact(n):
-        data=bytearray()
-        while len(data)<n:
-            chunk=worker.stdout.read(n-len(data))
-            if not chunk:raise RuntimeError('parser worker exited')
+        data = bytearray()
+        while len(data) < n:
+            chunk = worker.stdout.read(n - len(data))
+            if not chunk:
+                raise RuntimeError("parser worker exited")
             data.extend(chunk)
         return bytes(data)
+
     def server():
         try:
-            conn,_=listener.accept()
+            conn, _ = listener.accept()
             with conn:
-                conn.settimeout(.1)
+                conn.settimeout(0.1)
                 while not stop.is_set():
-                    try:data=conn.recv(64)
-                    except socket.timeout:continue
-                    if not data:break
-                    worker.stdin.write(struct.pack('<H',len(data))+data);worker.stdin.flush()
-                    a,b=struct.unpack('<HH',exact(4));reply=exact(a);raw=exact(b)
-                    negotiation.append((data.hex(),reply.hex()))
-                    if reply:conn.sendall(reply)
+                    try:
+                        data = conn.recv(64)
+                    except socket.timeout:
+                        continue
+                    if not data:
+                        break
+                    worker.stdin.write(struct.pack("<H", len(data)) + data)
+                    worker.stdin.flush()
+                    a, b = struct.unpack("<HH", exact(4))
+                    reply = exact(a)
+                    raw = exact(b)
+                    negotiation.append((data.hex(), reply.hex()))
+                    if reply:
+                        conn.sendall(reply)
                     captured.extend(raw)
-        except Exception as e:errors.append(e)
-    thread=threading.Thread(target=server,daemon=True);thread.start()
-    client=subprocess.Popen(['telnet','-8','--','127.0.0.1','-'+str(listener.getsockname()[1])],stdin=slave,stdout=slave,stderr=slave)
+        except Exception as e:
+            errors.append(e)
+
+    thread = threading.Thread(target=server, daemon=True)
+    thread.start()
+    client = subprocess.Popen(
+        ["telnet", "-8", "--", "127.0.0.1", "-" + str(listener.getsockname()[1])],
+        stdin=slave,
+        stdout=slave,
+        stderr=slave,
+    )
     try:
-        end=time.monotonic()+4
-        while time.monotonic()<end:
-            flags=termios.tcgetattr(slave)[3]
-            if not flags&(termios.ICANON|termios.ECHO):break
-            time.sleep(.02)
-        else:raise AssertionError(('stock telnet did not enter raw/no-echo mode',negotiation,errors,os.read(master,4096)))
-        output=bytearray()
-        while select.select([master],[],[],.05)[0]:output.extend(os.read(master,4096))
+        end = time.monotonic() + 4
+        while time.monotonic() < end:
+            flags = termios.tcgetattr(slave)[3]
+            if not flags & (termios.ICANON | termios.ECHO):
+                break
+            time.sleep(0.02)
+        else:
+            raise AssertionError(
+                (
+                    "stock telnet did not enter raw/no-echo mode",
+                    negotiation,
+                    errors,
+                    os.read(master, 4096),
+                )
+            )
+        output = bytearray()
+        while select.select([master], [], [], 0.05)[0]:
+            output.extend(os.read(master, 4096))
         # A keystroke and Konsole-style replies must reach the UART immediately,
         # without Enter, local echo, caret expansion or conversion of binary data.
-        payload=b'x\x1b[?62;1;4c\x1b]11;rgb:2323/2626/2727\x1b\\\r\x00\xff'
-        os.write(master,payload);end=time.monotonic()+3
-        while len(captured)<len(payload) and time.monotonic()<end:time.sleep(.01)
-        assert bytes(captured)==payload,(bytes(captured),payload)
-        assert not select.select([master],[],[],.15)[0],'local echo leaked'
-        print('PASS stock telnet -8: raw/no-echo PTY, immediate keys/terminal replies, binary CR/NUL/IAC and bounded negotiation')
+        payload = b"x\x1b[?62;1;4c\x1b]11;rgb:2323/2626/2727\x1b\\\r\x00\xff"
+        os.write(master, payload)
+        end = time.monotonic() + 3
+        while len(captured) < len(payload) and time.monotonic() < end:
+            time.sleep(0.01)
+        assert bytes(captured) == payload, (bytes(captured), payload)
+        assert not select.select([master], [], [], 0.15)[0], "local echo leaked"
+        print(
+            "PASS stock telnet -8: raw/no-echo PTY, immediate keys/terminal replies, binary CR/NUL/IAC and bounded negotiation"
+        )
     finally:
-        stop.set();client.terminate();client.wait(timeout=3);thread.join(timeout=2)
-        worker.stdin.close();worker.wait(timeout=3);listener.close();os.close(master);os.close(slave)
-    assert not errors,errors
+        stop.set()
+        client.terminate()
+        client.wait(timeout=3)
+        thread.join(timeout=2)
+        worker.stdin.close()
+        worker.wait(timeout=3)
+        listener.close()
+        os.close(master)
+        os.close(slave)
+    assert not errors, errors
 else:
-    print('SKIP stock-client integration: telnet is not installed')
+    print("SKIP stock-client integration: telnet is not installed")

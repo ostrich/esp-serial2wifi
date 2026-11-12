@@ -5,7 +5,7 @@
 
 # Explicit VERSION values win; builds otherwise identify their actual Git source.
 ifeq ($(origin VERSION),undefined)
-ifneq ($(filter-out setup help clean ui check-browser check-layout,$(or $(MAKECMDGOALS),all)),)
+ifneq ($(filter-out setup help clean ui check-browser check-layout format check-format,$(or $(MAKECMDGOALS),all)),)
 VERSION := $(shell python3 tools/build/write_config.py --print-version)
 ifneq ($(.SHELLSTATUS),0)
 $(error Cannot determine firmware version; supply VERSION=... when building without Git metadata)
@@ -75,4 +75,12 @@ help:
 	@echo "make check-layout BROWSER=/path     Run all-screen layout checks"
 	@echo "make factory-flash PORT=/dev/...    Erase and install; back up first"
 	@echo "make flash PORT=/dev/... SERIAL_SLOT=1  Update only the selected app slot"
+	@echo "make format / check-format         Apply or check source formatting"
 	@echo "make clean                         Remove build output, keep dependencies"
+
+.PHONY: format check-format
+format:
+	$(PYTHON) tools/format.py
+
+check-format:
+	$(PYTHON) tools/format.py --check

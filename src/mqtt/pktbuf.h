@@ -4,10 +4,10 @@
 #define PKTBUF_H
 
 typedef struct PktBuf {
-  struct PktBuf *next;   // next buffer in chain
-  uint16_t      references; // logical queue ownership plus any SDK borrow
-  uint16_t      filled;  // number of bytes filled in buffer
-  uint8_t       data[0]; // data in buffer
+  struct PktBuf *next; // next buffer in chain
+  uint16_t references; // logical queue ownership plus any SDK borrow
+  uint16_t filled;     // number of bytes filled in buffer
+  uint8_t data[0];     // data in buffer
 } PktBuf;
 
 void PktBuf_Retain(PktBuf *);
@@ -20,7 +20,7 @@ PktBuf *PktBuf_New(uint16_t length);
 PktBuf *PktBuf_Push(PktBuf *headBuf, PktBuf *buf);
 
 // Prepend a buffer to the beginning of a packet buffer queue, return new head
-PktBuf * PktBuf_Unshift(PktBuf *headBuf, PktBuf *buf);
+PktBuf *PktBuf_Unshift(PktBuf *headBuf, PktBuf *buf);
 
 // Shift first buffer off queue, returns new head (not shifted buffer!)
 PktBuf *PktBuf_Shift(PktBuf *headBuf);

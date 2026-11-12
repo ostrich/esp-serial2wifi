@@ -29,7 +29,7 @@ if ! which curl >/dev/null; then
   exit 1
 fi
 
-start=`date +%s`
+start=$(date +%s)
 
 # ===== Parse arguments
 
@@ -38,20 +38,35 @@ protocol=optiboot
 
 while getopts "hvp:" opt; do
   case "$opt" in
-    h) show_help; exit 0 ;;
-    v) verbose=1 ;;
-    p) protocol="$OPTARG" ;;
-    '?') show_help >&2; exit 1 ;;
+  h)
+    show_help
+    exit 0
+    ;;
+  v) verbose=1 ;;
+  p) protocol="$OPTARG" ;;
+  '?')
+    show_help >&2
+    exit 1
+    ;;
   esac
 done
 
 # Shift off the options and optional --.
-shift "$((OPTIND-1))"
+shift "$((OPTIND - 1))"
 
 case "$protocol" in
-  optiboot) endpoint=pgm; upload_timeout=10 ;;
-  stk500v2) endpoint=pgmmega; upload_timeout=20 ;;
-  *) echo "Unknown protocol: $protocol" >&2; exit 1 ;;
+optiboot)
+  endpoint=pgm
+  upload_timeout=10
+  ;;
+stk500v2)
+  endpoint=pgmmega
+  upload_timeout=20
+  ;;
+*)
+  echo "Unknown protocol: $protocol" >&2
+  exit 1
+  ;;
 esac
 
 # Get the fixed arguments
@@ -76,23 +91,25 @@ fi
 # ===== Get AVR in sync
 
 [[ -n "$verbose" ]] && echo "Resetting AVR with http://$hostname/$endpoint/sync" >&2
-v=; [[ -n "$verbose" ]] && v=-v
-sync=`curl -m 10 $v -s -w '%{http_code}' -XPOST -H "X-Serial2WiFi-Request: 1" "http://$hostname/$endpoint/sync"`
+v=
+[[ -n "$verbose" ]] && v=-v
+sync=$(curl -m 10 $v -s -w '%{http_code}' -XPOST -H "X-Serial2WiFi-Request: 1" "http://$hostname/$endpoint/sync")
 if [[ $? != 0 || "$sync" != 204 ]]; then
   echo "Error resetting AVR" >&2
   exit 1
 fi
 
 while true; do
-  sync=`curl -m 10 $v -s "http://$hostname/$endpoint/sync"`
+  sync=$(curl -m 10 $v -s "http://$hostname/$endpoint/sync")
   if [[ $? != 0 ]]; then
     echo "Error checking sync" >&2
     exit 1
   fi
   case "$sync" in
   SYNC*)
-    echo "AVR in $sync"  >&2
-    break;;
+    echo "AVR in $sync" >&2
+    break
+    ;;
   "NOT READY"*)
     [[ -n "$verbose" ]] && echo "  Waiting for sync..." >&2
     ;;
@@ -107,7 +124,7 @@ done
 # ===== Send HEX file
 
 [[ -n "$verbose" ]] && echo "Sending HEX file for programming" >&2
-sync=`curl -m "$upload_timeout" $v -s -g -H "X-Serial2WiFi-Request: 1" -d "@$hex" "http://$hostname/$endpoint/upload"`
+sync=$(curl -m "$upload_timeout" $v -s -g -H "X-Serial2WiFi-Request: 1" -d "@$hex" "http://$hostname/$endpoint/upload")
 curl_status=$?
 echo "$sync"
 if [[ $curl_status != 0 || ! "$sync" =~ ^Success ]]; then
@@ -115,6 +132,6 @@ if [[ $curl_status != 0 || ! "$sync" =~ ^Success ]]; then
   exit 1
 fi
 
-sec=$(( `date +%s` - $start ))
+sec=$(($(date +%s) - $start))
 echo "Success, took $sec seconds" >&2
 exit 0

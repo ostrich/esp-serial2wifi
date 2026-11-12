@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Exercise actual network endpoints/parser/validators with deterministic SDK faults."""
+
 import _paths
 from pathlib import Path
 import os, subprocess
-ROOT=Path(__file__).resolve().parents[2]
-BUILD=ROOT/'.build-tests/network';BUILD.mkdir(parents=True,exist_ok=True)
-header=r'''
+
+ROOT = Path(__file__).resolve().parents[2]
+BUILD = ROOT / ".build-tests/network"
+BUILD.mkdir(parents=True, exist_ok=True)
+header = r"""
 #include <assert.h>
 #include <stdlib.h>
 #include "operation.c"
@@ -168,9 +171,31 @@ int main(void){
  setup();assert(apNetworkConfigure(0x01071e0a,true));assert(apNetworkConfigure(0x0104a8c0,true));assert(!flashConfig.ap_address&&apIP.ip.addr==0x0104a8c0);
  assert(pauses==resumes);puts("PASS actual network API: strict body/credential validation, no secret reads, delayed receipts, save/SDK/readback failures, bounded scans/expiry/late callbacks, persistent AP addresses, DHCP rollback and AP restoration");
 }
-'''
-(BUILD/'test.c').write_text(header)
-subprocess.run(['cc','-std=c11','-g','-O1','-fsanitize=address,undefined','-fno-omit-frame-pointer',
- '-Wall','-Wextra','-Werror','-Wno-misleading-indentation','-Wno-ignored-qualifiers','-I'+str(ROOT/'tests/support/api-stubs'),'-I'+str(ROOT/'src/core'),'-I'+str(ROOT/'src/httpd'),
- str(BUILD/'test.c'),str(ROOT/'src/core/api_json.c'),'-o',str(BUILD/'test')],check=True)
-subprocess.run([str(BUILD/'test')],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
+"""
+(BUILD / "test.c").write_text(header)
+subprocess.run(
+    [
+        "cc",
+        "-std=c11",
+        "-g",
+        "-O1",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-misleading-indentation",
+        "-Wno-ignored-qualifiers",
+        "-I" + str(ROOT / "tests/support/api-stubs"),
+        "-I" + str(ROOT / "src/core"),
+        "-I" + str(ROOT / "src/httpd"),
+        str(BUILD / "test.c"),
+        str(ROOT / "src/core/api_json.c"),
+        "-o",
+        str(BUILD / "test"),
+    ],
+    check=True,
+)
+subprocess.run(
+    [str(BUILD / "test")], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"}
+)

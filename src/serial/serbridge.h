@@ -11,14 +11,14 @@
 // Payload budget, allocated on demand in immutable TCP-sized blocks.
 // Heap pressure can reject a slow client before reaching this upper bound.
 #define TX_BLOCK_BYTES 536
-#define MAX_TXBUFFER (24*TX_BLOCK_BYTES)
+#define MAX_TXBUFFER (24 * TX_BLOCK_BYTES)
 
 enum connModes {
-  cmInit = 0,        // initialization mode: nothing received yet
-  cmPGMInit,         // initialization mode for programming
-  cmTransparent,     // transparent mode
-  cmPGM,             // Arduino/AVR/ARM programming mode
-  cmTelnet,          // use telnet escape sequences for programming mode
+  cmInit = 0,    // initialization mode: nothing received yet
+  cmPGMInit,     // initialization mode for programming
+  cmTransparent, // transparent mode
+  cmPGM,         // Arduino/AVR/ARM programming mode
+  cmTelnet,      // use telnet escape sequences for programming mode
 };
 
 typedef struct TxBlock {
@@ -29,28 +29,28 @@ typedef struct TxBlock {
 } TxBlock;
 
 typedef struct serbridgeConnData {
-	struct espconn *conn;
-	enum connModes conn_mode;     // connection mode
-  uint8_t        telnet_state, telnet_baud_count;
-  bool           telnet_value_iac, programming_owned;
-  uint8_t        telnet_local, telnet_remote;
-  bool           telnet_console, telnet_cr, telnet_probe_iac;
-  uint32_t       telnet_baud;
-	uint16         txbufferlen;
-  uint16_t       txbuffersent; // submitted bytes awaiting completion
-  uint32_t       tx_next_sequence, tx_acked_sequence;
-  bool           tx_sequence_initialized, tx_copy_cursor_valid;
-  TxBlock        *txhead, *txtail;
-  bool           tx_failed, tx_recovering, programming_pending;
-  uint32_t       tx_progress_at, tx_recovery_at;
-  char           *rxbuffer;       // TCP input waiting for UART transmit space
-  uint16_t       rxbufferlen, rxbufferpos;
-  bool           rx_held;
-  uint16_t       txflights[4];
-  uint32_t       txflight_times[4];
-  uint8_t        txflighthead, txflightcount;
-  uint32_t       txlast_added;  // latest UART byte, for bounded TCP coalescing
-	bool           readytosend;   // true, if txbuffer can be sent by espconn_sent
+  struct espconn *conn;
+  enum connModes conn_mode; // connection mode
+  uint8_t telnet_state, telnet_baud_count;
+  bool telnet_value_iac, programming_owned;
+  uint8_t telnet_local, telnet_remote;
+  bool telnet_console, telnet_cr, telnet_probe_iac;
+  uint32_t telnet_baud;
+  uint16 txbufferlen;
+  uint16_t txbuffersent; // submitted bytes awaiting completion
+  uint32_t tx_next_sequence, tx_acked_sequence;
+  bool tx_sequence_initialized, tx_copy_cursor_valid;
+  TxBlock *txhead, *txtail;
+  bool tx_failed, tx_recovering, programming_pending;
+  uint32_t tx_progress_at, tx_recovery_at;
+  char *rxbuffer; // TCP input waiting for UART transmit space
+  uint16_t rxbufferlen, rxbufferpos;
+  bool rx_held;
+  uint16_t txflights[4];
+  uint32_t txflight_times[4];
+  uint8_t txflighthead, txflightcount;
+  uint32_t txlast_added; // latest UART byte, for bounded TCP coalescing
+  bool readytosend;      // true, if txbuffer can be sent by espconn_sent
 } serbridgeConnData;
 
 typedef struct {
@@ -76,7 +76,7 @@ void ICACHE_FLASH_ATTR serbridgeInitPins(void);
 void ICACHE_FLASH_ATTR serbridgeUartCb(char *buf, short len);
 void ICACHE_FLASH_ATTR serbridgeReset();
 
-int  ICACHE_FLASH_ATTR serbridgeInMCUFlashing();
+int ICACHE_FLASH_ATTR serbridgeInMCUFlashing();
 
 // callback when receiving UART chars when in programming mode
 extern void (*programmingCB)(char *buffer, short length);

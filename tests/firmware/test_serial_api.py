@@ -1,12 +1,20 @@
 #!/usr/bin/env python3
 """Actual UART/capture producers and serial APIs with independent byte oracles."""
+
 import _paths
-import base64,json,os,subprocess
+from source_text import SourceText
+import base64, json, os, subprocess
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'.build-tests/serial-api';OUT.mkdir(parents=True,exist_ok=True)
-console=(ROOT/'src/serial/console.c').read_text()
-ring=console[console.index('#define BUF_MAX'):console.index('int ICACHE_FLASH_ATTR\najaxConsoleReset(')]
-source=r'''
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / ".build-tests/serial-api"
+OUT.mkdir(parents=True, exist_ok=True)
+console = SourceText((ROOT / "src/serial/console.c").read_text())
+ring = console[
+    console.index("#define BUF_MAX") : console.index("int ICACHE_FLASH_ATTR\najaxConsoleReset(")
+]
+source = (
+    r"""
 #include <assert.h>
 #include <stdlib.h>
 #include <esp8266.h>
@@ -16,7 +24,9 @@ static unsigned streamHeap=24000;
 uint32_t system_get_free_heap_size(void){return streamHeap;}
 #define os_malloc allocate
 #include "console.h"
-''' + ring + r'''
+"""
+    + ring
+    + r"""
 static unsigned now=1,waits;
 unsigned system_get_time(void){return now;}
 #include "operation.c"
@@ -141,19 +151,50 @@ int main(void){
  strcpy(guard,"");unsigned before=writes;assert(request(apiSerialUART,valid)==415&&writes==before);strcpy(guard,"1");
  conn.conn=NULL;before=writes;apiSerialUART(&conn);assert(writes==before);
 }
-'''
-(OUT/'test.c').write_text(source)
-subprocess.run(['cc','-std=c11','-g','-O1','-fsanitize=address,undefined','-fno-omit-frame-pointer',
- '-Wall','-Wextra','-Werror','-Wno-misleading-indentation','-Wno-ignored-qualifiers',
- *['-I'+str(ROOT/p) for p in ['tests/support/api-stubs','src/core','src/httpd','src/serial','include']],
- str(OUT/'test.c'),str(ROOT/'src/core/api_json.c'),'-o',str(OUT/'test')],check=True)
-output=subprocess.check_output([str(OUT/'test')],text=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
-cases={name:json.loads(body) for name,body in (line.split('\t',1) for line in output.splitlines())}
-assert cases['empty']['data']=='' and cases['empty']['reason'] is None
-assert base64.b64decode(cases['binary']['data'])==bytes(i%256 for i in range(277,1300))
-assert cases['gap']['reason']=='gap' and cases['gap']['lost']==277
-assert base64.b64decode(cases['last']['data'])==bytes([1299%256])
-assert cases['caught-up']['data']==''
-assert cases['uart']['parity']=='O' and cases['uart']['data_bits']==5 and cases['uart']['stop_bits']=='2'
-(OUT/'responses.json').write_text(json.dumps(cases,indent=2)+'\n')
-print('PASS actual serial APIs: independent FIFO retains 4KiB listing and ACK stalls, bounded overflow/OOM/clear/abort/exclusivity, raw capture/cursors, UART rollback and paced input')
+"""
+)
+(OUT / "test.c").write_text(source)
+subprocess.run(
+    [
+        "cc",
+        "-std=c11",
+        "-g",
+        "-O1",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-misleading-indentation",
+        "-Wno-ignored-qualifiers",
+        *[
+            "-I" + str(ROOT / p)
+            for p in ["tests/support/api-stubs", "src/core", "src/httpd", "src/serial", "include"]
+        ],
+        str(OUT / "test.c"),
+        str(ROOT / "src/core/api_json.c"),
+        "-o",
+        str(OUT / "test"),
+    ],
+    check=True,
+)
+output = subprocess.check_output(
+    [str(OUT / "test")], text=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"}
+)
+cases = {
+    name: json.loads(body) for name, body in (line.split("\t", 1) for line in output.splitlines())
+}
+assert cases["empty"]["data"] == "" and cases["empty"]["reason"] is None
+assert base64.b64decode(cases["binary"]["data"]) == bytes(i % 256 for i in range(277, 1300))
+assert cases["gap"]["reason"] == "gap" and cases["gap"]["lost"] == 277
+assert base64.b64decode(cases["last"]["data"]) == bytes([1299 % 256])
+assert cases["caught-up"]["data"] == ""
+assert (
+    cases["uart"]["parity"] == "O"
+    and cases["uart"]["data_bits"] == 5
+    and cases["uart"]["stop_bits"] == "2"
+)
+(OUT / "responses.json").write_text(json.dumps(cases, indent=2) + "\n")
+print(
+    "PASS actual serial APIs: independent FIFO retains 4KiB listing and ACK stalls, bounded overflow/OOM/clear/abort/exclusivity, raw capture/cursors, UART rollback and paced input"
+)

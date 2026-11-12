@@ -11,47 +11,46 @@
 #define HTTPD_METHOD_GET 1
 #define HTTPD_METHOD_POST 2
 
-
 typedef struct HttpdPriv HttpdPriv;
 typedef struct HttpdConnData HttpdConnData;
 typedef struct HttpdPostData HttpdPostData;
 
-typedef int (* cgiSendCallback)(HttpdConnData *connData);
+typedef int (*cgiSendCallback)(HttpdConnData *connData);
 
 //A struct describing a http connection. This gets passed to cgi functions.
 struct HttpdConnData {
-	struct espconn *conn;
-	//int remote_port;
-	//uint8 remote_ip[4];
-	uint32 startTime;
-	char requestType;  // HTTP_METHOD_GET | HTTPD_METHOD_POST
-	char *url;
-	char *getArgs;
-	const void *cgiArg;
-	void *cgiData;
-	void *cgiPrivData; // Used for streaming handlers storing state between requests
-	void *cgiResponse; // used for forwarding response to the CGI handler
-	HttpdPriv *priv;
-	cgiSendCallback cgi;
-	HttpdPostData *post;
+  struct espconn *conn;
+  //int remote_port;
+  //uint8 remote_ip[4];
+  uint32 startTime;
+  char requestType; // HTTP_METHOD_GET | HTTPD_METHOD_POST
+  char *url;
+  char *getArgs;
+  const void *cgiArg;
+  void *cgiData;
+  void *cgiPrivData; // Used for streaming handlers storing state between requests
+  void *cgiResponse; // used for forwarding response to the CGI handler
+  HttpdPriv *priv;
+  cgiSendCallback cgi;
+  HttpdPostData *post;
 };
 
 //A struct describing the POST data sent inside the http connection.  This is used by the CGI functions
 struct HttpdPostData {
-	int len; // POST Content-Length
-	int buffSize; // The maximum length of the post buffer
-	int buffLen; // The amount of bytes in the current post buffer
-	int received; // The total amount of bytes received so far
-	char *buff; // Actual POST data buffer
-	char *multipartBoundary;
+  int len;      // POST Content-Length
+  int buffSize; // The maximum length of the post buffer
+  int buffLen;  // The amount of bytes in the current post buffer
+  int received; // The total amount of bytes received so far
+  char *buff;   // Actual POST data buffer
+  char *multipartBoundary;
 };
 
 //A struct describing an url. This is the main struct that's used to send different URL requests to
 //different routines.
 typedef struct {
-	const char *url;
-	cgiSendCallback cgiCb;
-	const void *cgiArg;
+  const char *url;
+  cgiSendCallback cgiCb;
+  const void *cgiArg;
 } HttpdBuiltInUrl;
 
 int ICACHE_FLASH_ATTR cgiRedirect(HttpdConnData *connData);
@@ -69,8 +68,8 @@ int ICACHE_FLASH_ATTR httpdSend(HttpdConnData *conn, const char *data, int len);
 void ICACHE_FLASH_ATTR httpdFlush(HttpdConnData *conn);
 void ICACHE_FLASH_ATTR httpdReleaseHeaders(HttpdConnData *conn);
 // Resume a streaming CGI after a bounded delay, with fresh callback storage.
-void ICACHE_FLASH_ATTR httpdWait(HttpdConnData *conn,unsigned milliseconds);
-HttpdConnData * ICACHE_FLASH_ATTR  httpdLookUpConn(uint8_t * ip, int port);
-int ICACHE_FLASH_ATTR  httpdSetCGIResponse(HttpdConnData * conn, void *response);
+void ICACHE_FLASH_ATTR httpdWait(HttpdConnData *conn, unsigned milliseconds);
+HttpdConnData *ICACHE_FLASH_ATTR httpdLookUpConn(uint8_t *ip, int port);
+int ICACHE_FLASH_ATTR httpdSetCGIResponse(HttpdConnData *conn, void *response);
 
 #endif

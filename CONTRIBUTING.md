@@ -8,6 +8,7 @@ capacity difference. Keep serial input explicit: navigation, reconnects and
 resizing must not send shell commands or assume the attached device runs Linux.
 Do not automatically retry writes whose outcome is unknown.
 
+Run `make format` before submitting changes; CI enforces `make check-format`.
 Run `make check` for firmware changes and the browser/layout checks for UI
 changes. Report hardware checks separately from local tests. Preserve flash-region
 guards, SDK transport bindings and stored-format compatibility; changes to these

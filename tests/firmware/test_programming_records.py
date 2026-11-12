@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """Actual shared Intel HEX producer: bounded pages and malformed records."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
-import os,subprocess,sys,re
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'.build-tests/programming-records';OUT.mkdir(parents=True,exist_ok=True)
-path=Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/'src/core/pgmshared.c'
-s=path.read_text();body=s[s.index('struct optibootData *optibootData;'):]
-h=(ROOT/'src/core/pgmshared.h').read_text();record=re.search(r'extern struct optibootData \{.*?\} \*optibootData;',h,re.S).group()
-source=r'''
+import os, subprocess, sys, re
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / ".build-tests/programming-records"
+OUT.mkdir(parents=True, exist_ok=True)
+path = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "src/core/pgmshared.c"
+s = SourceText(path.read_text())
+body = s[s.index("struct optibootData *optibootData;") :]
+h = SourceText((ROOT / "src/core/pgmshared.h").read_text())
+record = re.search(r"extern struct optibootData \{.*?\} \*optibootData;", h, re.S).group()
+source = (
+    r"""
 #include <assert.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -23,10 +31,14 @@ source=r'''
 #define PGM_PAGE_BYTES 512
 #define PGM_PAGE_BUFFER_BYTES 768
 typedef struct {int unused;} HttpdConnData;
-''' +record+r'''
+"""
+    + record
+    + r"""
 bool megaProgramPage(void);
 bool optibootProgramPage(void);
-'''+body+r'''
+"""
+    + body
+    + r"""
 static unsigned written;
 static uint8_t oracle[65536];
 static bool failPage;
@@ -60,9 +72,31 @@ int main(void){
  state.eof=false;state.pageLen=0;recordHex(record,0,0,255,0);failPage=true;assert(!processRecord(record,strlen(record)));failPage=false;
  free(state.pageBuf);puts("PASS actual HEX producer: long records drain all full pages (128/256/512), exact byte oracle, malformed lengths/checksum/type and programmer failures");
 }
-'''
+"""
+)
 # No leaked initial allocation: each loop allocates its own guarded producer buffer.
-source=source.replace('state.pageBuf=malloc(PGM_PAGE_BUFFER_BYTES);assert(state.pageBuf);\n char record', 'char record')
-(OUT/'test.c').write_text(source)
-subprocess.run(['cc','-std=c11','-g','-O1','-Wall','-Wextra','-Werror','-Wno-unused-function','-fsanitize=address,undefined',str(OUT/'test.c'),'-o',str(OUT/'test')],check=True)
-subprocess.run([str(OUT/'test')],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1'})
+source = source.replace(
+    "state.pageBuf=malloc(PGM_PAGE_BUFFER_BYTES);assert(state.pageBuf);\n char record",
+    "char record",
+)
+(OUT / "test.c").write_text(source)
+subprocess.run(
+    [
+        "cc",
+        "-std=c11",
+        "-g",
+        "-O1",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-unused-function",
+        "-fsanitize=address,undefined",
+        str(OUT / "test.c"),
+        "-o",
+        str(OUT / "test"),
+    ],
+    check=True,
+)
+subprocess.run(
+    [str(OUT / "test")], check=True, env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1"}
+)

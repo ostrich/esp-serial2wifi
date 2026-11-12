@@ -75,6 +75,20 @@ Ordinary builds use the prepared SDK offline. `make setup OFFLINE=1` also needs
 an already installed Python environment, cached npm packages and local SDK
 archives; it cannot prepare an empty checkout without downloads.
 
+## Source formatting
+
+Run `make setup` to install the pinned formatters, then use `make format` to
+apply formatting or `make check-format` to check it. CI runs the same check in
+a separate job before building firmware. Editors can use the root `.editorconfig`
+and formatter configuration files.
+
+C and headers use clang-format; Python uses Ruff; JavaScript, CSS, HTML, JSON,
+YAML and Markdown use Prettier; shell scripts use shfmt. C/web/shell indentation
+is two spaces, Python uses four, and Make recipes retain tabs. Generated files,
+vendor libraries and the upstream Pure CSS asset are excluded. Embedded C strings
+in Python tests are kept intact; harness boundaries tolerate C whitespace changes.
+Formatter versions are pinned in `requirements-format.txt` and `package-lock.json`.
+
 ## Test and develop the UI
 
 ```sh
@@ -149,17 +163,17 @@ scripts or adding one-file wrappers around existing commands.
 
 ## Code and storage layout
 
-| Location | Purpose |
-| --- | --- |
-| `src/core/` | Configuration, Wi-Fi, versioned API, flash and updates |
-| `src/serial/` | UART, capture, TCP/Telnet, SLIP and SDK transport overrides |
-| Other `src/` modules | HTTP server, ESPFS, MCU commands, MQTT, HTTP/socket clients, custom pages and syslog |
-| `include/` | Shared platform headers |
-| `web/app/` | Browser interface |
-| `web/custom-pages/`, `web/artwork/` | MCU page helpers and icon source |
-| `third_party/` | Vendored terminal distributions and notices |
-| `tools/`, `mk/` | Setup, asset/image generation, packaging, flashing and build rules |
-| `tests/` | Native/browser tests, stubs and synthetic fixtures |
+| Location                            | Purpose                                                                              |
+| ----------------------------------- | ------------------------------------------------------------------------------------ |
+| `src/core/`                         | Configuration, Wi-Fi, versioned API, flash and updates                               |
+| `src/serial/`                       | UART, capture, TCP/Telnet, SLIP and SDK transport overrides                          |
+| Other `src/` modules                | HTTP server, ESPFS, MCU commands, MQTT, HTTP/socket clients, custom pages and syslog |
+| `include/`                          | Shared platform headers                                                              |
+| `web/app/`                          | Browser interface                                                                    |
+| `web/custom-pages/`, `web/artwork/` | MCU page helpers and icon source                                                     |
+| `third_party/`                      | Vendored terminal distributions and notices                                          |
+| `tools/`, `mk/`                     | Setup, asset/image generation, packaging, flashing and build rules                   |
+| `tests/`                            | Native/browser tests, stubs and synthetic fixtures                                   |
 
 The Non-OS SDK runs cooperative callbacks. Keep UART/TCP work bounded and retain
 transmit buffers until copied or acknowledged. Build-time symbol rewriting
@@ -177,10 +191,10 @@ from API reads. Custom pages and MCU callbacks are trusted application code.
 Original upstream management endpoints and configuration migrations are not
 supported; MCU protocol endpoints remain for the supported programming features.
 
-| Standard build | Maximum application image | Update method |
-| --- | ---: | --- |
-| 512 KB | 479,232 bytes | Serial flashing |
-| 4 MB | 503,808 bytes per slot | OTA or serial flashing |
+| Standard build | Maximum application image | Update method          |
+| -------------- | ------------------------: | ---------------------- |
+| 512 KB         |             479,232 bytes | Serial flashing        |
+| 4 MB           |    503,808 bytes per slot | OTA or serial flashing |
 
 Use `tools/lib/flash_layout.py` and the build manifest as the authority for addresses.
 Configuration has two CRC-protected copies with a sequence commit protocol;

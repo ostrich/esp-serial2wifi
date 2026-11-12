@@ -1,21 +1,23 @@
 #!/usr/bin/env python3
 """Execute actual bridge policy with pinned SDK timeout/congestion branch."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
 import subprocess, argparse
 
-root=Path(__file__).resolve().parents[2]
-parser=argparse.ArgumentParser(description=__doc__)
-parser.add_argument('--sdk',type=Path,required=True)
-args=parser.parse_args()
-sdk=args.sdk
-b=root/'.build-tests/sdk-rto'
-b.mkdir(parents=True,exist_ok=True)
-s=(sdk/'third_party/lwip/core/tcp.c').read_text(encoding='latin1')
-at=s.index('        /* Increase the retransmission timer if it is running */')
-end=s.index('\n      }\n    }\n    /* Check if',at)
-timer=s[at:end]
-prefix=r'''
+root = Path(__file__).resolve().parents[2]
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--sdk", type=Path, required=True)
+args = parser.parse_args()
+sdk = args.sdk
+b = root / ".build-tests/sdk-rto"
+b.mkdir(parents=True, exist_ok=True)
+s = SourceText((sdk / "third_party/lwip/core/tcp.c").read_text(encoding="latin1"))
+at = s.index("        /* Increase the retransmission timer if it is running */")
+end = s.index("\n      }\n    }\n    /* Check if", at)
+timer = s[at:end]
+prefix = r"""
 #include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -52,8 +54,8 @@ void vendor_tcp_rexmit_fast(struct tcp_pcb *p) {vendor_fast++;p->nrtx++;}
 void vendor_tcp_slowtmr(void) {
  struct tcp_pcb *pcb; unsigned eff_wnd;
  for(pcb=tcp_active_pcbs;pcb;pcb=pcb->next) {
-'''
-tests=r'''
+"""
+tests = r"""
 int main(void) {
  struct tcp_seg seg={0};
  struct esp_tcp tcp={.local_port=23,.remote_port=4321,.remote_ip={192,168,4,2}};
@@ -134,11 +136,29 @@ int main(void) {
  char out[1024];sdk_rto_json(out);assert(strlen(out)<sizeof(out));
  puts("PASS microsecond wrap, estimator update order, capped arithmetic, backoff and bounded JSON");
 }
-'''
-native=b/'native.c'
-native.write_text(prefix+timer+'\n}}\n'+(root/'src/serial/sdk_rto.c').read_text()+tests,encoding='latin1')
-subprocess.run(['cc','-I'+str(root/'src/serial'),'-std=c11','-Wall','-Wextra','-Werror',
- '-fsanitize=address,undefined','-g',str(native),'-o',str(b/'native')],check=True)
-r=subprocess.run([str(b/'native')],text=True,capture_output=True)
-(b/'native.log').write_text(r.stdout+r.stderr)
-print(r.stdout,end='');r.check_returncode()
+"""
+native = b / "native.c"
+native.write_text(
+    prefix + timer + "\n}}\n" + SourceText((root / "src/serial/sdk_rto.c").read_text()) + tests,
+    encoding="latin1",
+)
+subprocess.run(
+    [
+        "cc",
+        "-I" + str(root / "src/serial"),
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-fsanitize=address,undefined",
+        "-g",
+        str(native),
+        "-o",
+        str(b / "native"),
+    ],
+    check=True,
+)
+r = subprocess.run([str(b / "native")], text=True, capture_output=True)
+(b / "native.log").write_text(r.stdout + r.stderr)
+print(r.stdout, end="")
+r.check_returncode()

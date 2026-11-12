@@ -4,6 +4,7 @@
 Run through tests/run.py; vectors and synthetic sections are self-contained.
 Temporary files stay within this workspace.
 """
+
 import _paths
 
 import binascii
@@ -76,10 +77,12 @@ class ImageTests(unittest.TestCase):
         )
 
     def test_sdk3_entry_wrapper_preferred(self):
-        symbols = (f"{self.entry + 8:08x} T call_user_start\n"
-                   f"{self.entry:08x} T call_user_start1\n"
-                   f"{self.addresses[1]:08x} A _data_start\n"
-                   f"{self.addresses[2]:08x} A _rodata_start\n")
+        symbols = (
+            f"{self.entry + 8:08x} T call_user_start\n"
+            f"{self.entry:08x} T call_user_start1\n"
+            f"{self.addresses[1]:08x} A _data_start\n"
+            f"{self.addresses[2]:08x} A _rodata_start\n"
+        )
         run = self.generate(symbols=symbols)
         self.assertEqual(run.returncode, 0, run.stderr)
         self.assertEqual(self.image(), self.expected(2, 0))
@@ -152,7 +155,6 @@ class ImageTests(unittest.TestCase):
         self.env["NM_EXIT"] = "7"
         self.assertNotEqual(self.generate().returncode, 0)
         self.assertFalse((self.work / "eagle.app.flash.bin").exists())
-
 
 
 if __name__ == "__main__":

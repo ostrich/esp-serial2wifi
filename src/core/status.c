@@ -23,34 +23,31 @@ extern MQTT_Client mqttClient;
 //===== MQTT Status update
 
 // Every minute...
-#define MQTT_STATUS_INTERVAL (60*1000)
+#define MQTT_STATUS_INTERVAL (60 * 1000)
 
 static ETSTimer mqttStatusTimer;
 
-int ICACHE_FLASH_ATTR
-mqttStatusMsg(char *buf) {
+int ICACHE_FLASH_ATTR mqttStatusMsg(char *buf) {
   sint8 rssi = wifi_station_get_rssi();
-  if (rssi > 0) rssi = 0; // not connected or other error
+  if (rssi > 0)
+    rssi = 0; // not connected or other error
   //os_printf("timer rssi=%d\n", rssi);
 
   // compose MQTT message
-  return os_sprintf(buf,
-    "{\"rssi\":%d, \"heap_free\":%ld}",
-    rssi, (unsigned long)system_get_free_heap_size());
+  return os_sprintf(buf, "{\"rssi\":%d, \"heap_free\":%ld}", rssi,
+                    (unsigned long)system_get_free_heap_size());
 }
 
 // Timer callback to send an RSSI update to a monitoring system
 static void ICACHE_FLASH_ATTR mqttStatusCb(void *v) {
   if (!flashConfig.mqtt_status_enable || os_strlen(flashConfig.mqtt_status_topic) == 0 ||
-    mqttClient.connState != MQTT_CONNECTED)
+      mqttClient.connState != MQTT_CONNECTED)
     return;
 
   char buf[128];
   mqttStatusMsg(buf);
   MQTT_Publish(&mqttClient, flashConfig.mqtt_status_topic, buf, os_strlen(buf), 1, 0);
 }
-
-
 
 #endif // MQTT
 
@@ -61,12 +58,13 @@ static ETSTimer ledTimer;
 // Set the LED on or off, respecting the defined polarity
 static void ICACHE_FLASH_ATTR setLed(int on) {
   int8_t pin = flashConfig.conn_led_pin;
-  if (pin < 0) return; // disabled
+  if (pin < 0)
+    return; // disabled
   // LED is active-low
   if (on) {
-    gpio_output_set(0, (1<<pin), (1<<pin), 0);
+    gpio_output_set(0, (1 << pin), (1 << pin), 0);
   } else {
-    gpio_output_set((1<<pin), 0, (1<<pin), 0);
+    gpio_output_set((1 << pin), 0, (1 << pin), 0);
   }
 }
 
@@ -79,7 +77,7 @@ static void ICACHE_FLASH_ATTR ledTimerCb(void *v) {
 
   if (wifiState == wifiGotIP) {
     // connected, all is good, solid light with a short dark blip every 3 seconds
-    ledState = 1-ledState;
+    ledState = 1 - ledState;
     time = ledState ? 2900 : 100;
   } else if (wifiState == wifiIsConnected) {
     // waiting for DHCP, go on/off every second
@@ -92,11 +90,11 @@ static void ICACHE_FLASH_ATTR ledTimerCb(void *v) {
       ledState = 0;
       break;
     case 2: // AP
-      ledState = 1-ledState;
+      ledState = 1 - ledState;
       time = ledState ? 50 : 1950;
       break;
     case 3: // STA+AP
-      ledState = 1-ledState;
+      ledState = 1 - ledState;
       time = ledState ? 50 : 950;
       break;
     }
@@ -135,5 +133,5 @@ void ICACHE_FLASH_ATTR statusInit(void) {
   os_timer_disarm(&mqttStatusTimer);
   os_timer_setfn(&mqttStatusTimer, mqttStatusCb, NULL);
   os_timer_arm(&mqttStatusTimer, MQTT_STATUS_INTERVAL, 1); // recurring timer
-#endif // MQTT
+#endif                                                     // MQTT
 }

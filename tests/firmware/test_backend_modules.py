@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Real backend modules with bounded frames, borrowed sends and reordered callbacks."""
+
 import _paths
+from source_text import SourceText
 from pathlib import Path
-import os,subprocess
-ROOT=Path(__file__).resolve().parents[2];OUT=ROOT/'.build-tests/backend-modules';OUT.mkdir(parents=True,exist_ok=True)
-SDK=r'''
+import os, subprocess
+
+ROOT = Path(__file__).resolve().parents[2]
+OUT = ROOT / ".build-tests/backend-modules"
+OUT.mkdir(parents=True, exist_ok=True)
+SDK = r"""
 #ifndef BACKEND_SDK
 #define BACKEND_SDK
 #include <stdint.h>
@@ -89,10 +94,11 @@ static void ack(struct espconn *p){assert(p->borrowed);assert(wireUsed+p->borrow
 static void terminal(struct espconn *p,bool reset){p->borrowed=NULL;p->registered=false;if(reset)p->recon_cb(p,-3);else p->discon_cb(p);}
 static void resolved(unsigned n,bool okay){assert(n<dnsCount);ip_addr_t ip={0x01020304};dns[n].callback("test",okay?&ip:NULL,dns[n].conn);}
 #endif
-'''
-(OUT/'esp8266.h').write_text(SDK)
-for name in ('c_types.h','ip_addr.h','espconn.h'):(OUT/name).write_text('#include "esp8266.h"\n')
-COMMON=r'''
+"""
+(OUT / "esp8266.h").write_text(SDK)
+for name in ("c_types.h", "ip_addr.h", "espconn.h"):
+    (OUT / name).write_text('#include "esp8266.h"\n')
+COMMON = r"""
 #include <esp8266.h>
 #include "cmd.h"
 #define DBG(...) ((void)0)
@@ -101,30 +107,89 @@ static unsigned responses,responseArgs,responseValue;static uint8_t responseData
 void cmdResponseStart(uint16_t cmd,uint32_t value,uint16_t argc){(void)cmd;responses++;responseValue=value;responseArgs=argc;responseAt=0;memset(responseLengths,0,sizeof responseLengths);}
 void cmdResponseBody(const void *p,uint16_t n){assert(responseAt<8&&n<2048);memcpy(responseData[responseAt],p,n);responseLengths[responseAt++]=n;}
 void cmdResponseEnd(void){}
-'''
-cmd=(ROOT/'src/cmd/cmd.c').read_text();COMMON+=cmd[cmd.index('// Execute a parsed command'):]
-COMMON+=r'''
+"""
+cmd = SourceText((ROOT / "src/cmd/cmd.c").read_text())
+COMMON += cmd[cmd.index("// Execute a parsed command") :]
+COMMON += r"""
 typedef struct {const void *data;unsigned n;} Arg;
 static void request(unsigned command,unsigned value,unsigned argc,const Arg *args){uint8_t frame[4096]={0};CmdPacket *p=(CmdPacket*)frame;p->cmd=command;p->value=value;p->argc=argc;unsigned at=sizeof(*p);
  for(unsigned i=0;i<argc;i++){unsigned n=args[i].n;assert(at+2+((n+3)&~3U)<=sizeof frame);frame[at++]=n;frame[at++]=n>>8;memcpy(frame+at,args[i].data,n);at+=(n+3)&~3U;}
  cmdParsePacket(frame,at);
 }
-'''
+"""
 
-def run(name,module,test,extra=''):
-    for file,directory in [('rest.c','rest'),('socket.c','socket'),('mqtt.c','mqtt'),('pktbuf.c','mqtt'),('mqtt_msg.c','mqtt')]:
-        module=module.replace('#include "'+file+'"','#include "'+str(ROOT/'src'/directory/file)+'"')
-    path=OUT/(name+'-test.c');path.write_text(COMMON+'\n#include "netclient.c"\n'+extra+module+test)
-    exe=OUT/name
-    subprocess.run(['cc','-std=c99','-g','-O1','-fno-pie','-no-pie','-fsanitize=address,undefined','-fno-omit-frame-pointer','-Wall','-Wextra','-Werror','-Wno-unused-parameter','-Wno-unused-function','-Wno-misleading-indentation','-Wno-ignored-qualifiers',*['-I'+str(p) for p in (OUT,ROOT/'src/cmd',ROOT/'src/core',ROOT/'src/mqtt',ROOT/'src/rest',ROOT/'src/socket',ROOT/'src/httpd',ROOT/'src/web-server',ROOT/'src/syslog')],str(path),'-o',str(exe)],check=True)
-    subprocess.run([str(exe)],check=True,env={**os.environ,'ASAN_OPTIONS':'detect_leaks=1','UBSAN_OPTIONS':'halt_on_error=1'})
 
-run('frames','',r'''
+def run(name, module, test, extra=""):
+    for file, directory in [
+        ("rest.c", "rest"),
+        ("socket.c", "socket"),
+        ("mqtt.c", "mqtt"),
+        ("pktbuf.c", "mqtt"),
+        ("mqtt_msg.c", "mqtt"),
+    ]:
+        module = module.replace(
+            '#include "' + file + '"', '#include "' + str(ROOT / "src" / directory / file) + '"'
+        )
+    path = OUT / (name + "-test.c")
+    path.write_text(COMMON + '\n#include "netclient.c"\n' + extra + module + test)
+    exe = OUT / name
+    subprocess.run(
+        [
+            "cc",
+            "-std=c99",
+            "-g",
+            "-O1",
+            "-fno-pie",
+            "-no-pie",
+            "-fsanitize=address,undefined",
+            "-fno-omit-frame-pointer",
+            "-Wall",
+            "-Wextra",
+            "-Werror",
+            "-Wno-unused-parameter",
+            "-Wno-unused-function",
+            "-Wno-misleading-indentation",
+            "-Wno-ignored-qualifiers",
+            *[
+                "-I" + str(p)
+                for p in (
+                    OUT,
+                    ROOT / "src/cmd",
+                    ROOT / "src/core",
+                    ROOT / "src/mqtt",
+                    ROOT / "src/rest",
+                    ROOT / "src/socket",
+                    ROOT / "src/httpd",
+                    ROOT / "src/web-server",
+                    ROOT / "src/syslog",
+                )
+            ],
+            str(path),
+            "-o",
+            str(exe),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [str(exe)],
+        check=True,
+        env={**os.environ, "ASAN_OPTIONS": "detect_leaks=1", "UBSAN_OPTIONS": "halt_on_error=1"},
+    )
+
+
+run(
+    "frames",
+    "",
+    r"""
 static unsigned calls;static void handle(CmdPacket *p){CmdRequest req;cmdRequest(&req,p);uint32_t value;assert(cmdPopArg(&req,&value,4)==0);assert(value==42);assert(cmdArgLen(&req)==0);assert(cmdPopArg(&req,&value,4)==-1);calls++;}
 const CmdList commands[]={{1,"test",handle},{0,0,0}};
 int main(void){uint32_t value=42;Arg a={&value,4};request(1,0,1,&a);assert(calls==1);uint8_t bad[12]={1,0,1,0,0,0,0,0,4,0};cmdParsePacket(bad,8);cmdParsePacket(bad,12);assert(calls==1);request(65535,0,0,NULL);assert(calls==1&&!allocations);puts("PASS bounded SLIP frames, argument exhaustion and unknown command dispatch");}
-''')
-run('rest','#include "rest.c"\n',r'''
+""",
+)
+run(
+    "rest",
+    '#include "rest.c"\n',
+    r"""
 const CmdList commands[]={{20,"setup",REST_Setup},{21,"request",REST_Request},{22,"header",REST_SetHeader},{0,0,0}};
 static unsigned setup(void){uint16_t port=80;uint8_t security=0;Arg a[]={{"1.2.3.4",7},{&port,2},{&security,1}};request(20,99,3,a);return responseValue;}
 int main(void){
@@ -143,8 +208,12 @@ int main(void){
  uint16_t port=80;uint8_t security=0;Arg b[]={{"test",4},{&port,2},{&security,1}};restNum=0;request(20,1,3,b);request(21,0,2,a);assert(restClient[0].resolving);unsigned first=dnsCount-1;
  restNum=0;request(20,1,3,b);assert(responseValue==UINT32_MAX);resolved(first,false);assert(!restClient[0].busy);restFree(restClient);assert(!allocations);
  puts("PASS real REST: every header/body split, chunked/trailers, single response, busy reuse, DNS and allocation failures");}
-''')
-run('socket','#include "socket.c"\n',r'''
+""",
+)
+run(
+    "socket",
+    '#include "socket.c"\n',
+    r"""
 const CmdList commands[]={{40,"setup",SOCKET_Setup},{41,"send",SOCKET_Send},{0,0,0}};
 static unsigned setup(unsigned mode,const char *host){uint16_t port=1234;uint8_t m=mode;Arg a[]={{host,strlen(host)},{&port,2},{&m,1}};request(40,77,3,a);return responseValue;}
 int main(void){
@@ -158,8 +227,12 @@ int main(void){
  for(unsigned fail=1;fail<=3;fail++){allocateAt=allocationCalls+fail;socketNum=0;setup(SOCKET_UDP,"1.2.3.4");allocateAt=0;for(unsigned i=0;i<MAX_SOCKET;i++)socketFree(socketClient+i);assert(!allocations);}
  socketNum=0;setup(SOCKET_UDP,"1.2.3.4");p=c->pCon;for(unsigned fail=1;fail<=3;fail++){socketNum=0;allocateAt=allocationCalls+fail;setup(SOCKET_UDP,"1.2.3.4");allocateAt=0;assert(c->pCon==p&&p->registered&&c->connected);}socketFree(c);assert(!allocations);
  puts("PASS real sockets: exact multichunk payload, no duplicate submissions, borrowed-error lifetime, broadcast ACK ownership and allocation failures");}
-''')
-run('mqtt','#include "pktbuf.c"\n#include "mqtt_msg.c"\n#include "mqtt.c"\n',r'''
+""",
+)
+run(
+    "mqtt",
+    '#include "pktbuf.c"\n#include "mqtt_msg.c"\n#include "mqtt.c"\n',
+    r"""
 const CmdList commands[]={{0,0,0}};
 int main(void){
  MQTT_Client c={0};for(unsigned fail=1;fail<=6;fail++){allocateAt=allocationCalls+fail;assert(!MQTT_Init(&c,"test",1883,0,2,"id","user","pw",300));allocateAt=0;assert(!allocations);}
@@ -179,9 +252,10 @@ int main(void){
  uint8_t invalid[]={0x30,0x80,0x80,0x80,0x80,0};assert(mqtt_get_total_length(invalid,6)==-1);assert(mqtt_get_total_length(invalid,2)==0);
  allocateAt=allocationCalls+1;assert(!PktBuf_New(128));allocateAt=0;
  puts("PASS real MQTT: allocation rollback, full-width keepalive, QoS, fragmented CONNACK, DNS retirement and borrowed buffers across settings/reset");}
-''')
+""",
+)
 # Focused real web serializer and readback handlers share the actual JSON/form implementation.
-HTTP=r'''
+HTTP = r"""
 #include "httpd.h"
 #include "api_request.h"
 #include "api_json.c"
@@ -194,9 +268,17 @@ void httpdHeader(HttpdConnData *c,const char *a,const char *b){(void)c;(void)a;(
 void httpdEndHeaders(HttpdConnData *c){(void)c;}
 int httpdSend(HttpdConnData *c,const char *p,int n){(void)c;if(n<0)n=strlen(p);if(outputUsed+n>2600)return 0;memcpy(httpOutput+outputUsed,p,n);outputUsed+=n;httpOutput[outputUsed]=0;return 1;}
 int httpdGetHeader(HttpdConnData *c,char *name,char *out,int n){(void)c;snprintf(out,n,"%s",!strcmp(name,"X-Serial2WiFi-Request")?guard:"application/x-www-form-urlencoded");return 1;}
-'''
-web=(ROOT/'src/web-server/web-server.c').read_text();web=web[web.index('static void ICACHE_FLASH_ATTR webResponse('):web.index('// this method is responsible for the MCU')]
-run('web-response',HTTP+'\n#include "web-server.h"\n'+web,r'''
+"""
+web = SourceText((ROOT / "src/web-server/web-server.c").read_text())
+web = web[
+    web.index("static void ICACHE_FLASH_ATTR webResponse(") : web.index(
+        "// this method is responsible for the MCU"
+    )
+]
+run(
+    "web-response",
+    HTTP + '\n#include "web-server.h"\n' + web,
+    r"""
 const CmdList commands[]={{0,0,0}};
 int main(void){
  struct espconn socket={0};HttpdConnData c={.conn=&socket};uint8_t frame[2048]={0};CmdPacket *p=(CmdPacket*)frame;uint8_t *args=(uint8_t*)p->args;p->argc=1;
@@ -209,9 +291,18 @@ int main(void){
  float f=-0.5f;n=6;args[0]=n;args[1]=0;args[2]=WEB_FLOAT;args[3]=0;memcpy(args+4,&f,4);req.end=frame+sizeof(*p)+2+8;
  WEB_handleMCUResponse(&c,&req);assert(code==200&&!strcmp(httpOutput,"{\"\":-0.500}"));
  assert(!allocations);puts("PASS actual custom-page JSON: escaped expansion, field names/control bytes, typed length refusal and negative fractions");}
-''')
-mega=(ROOT/'src/core/cgimega.c').read_text();mega=mega[mega.index('typedef struct {uint32_t address;unsigned remaining;} MegaRead;'):mega.index('void ICACHE_FLASH_ATTR sendReadFuseQuery')]
-run('mega-read',HTTP+r'''
+""",
+)
+mega = SourceText((ROOT / "src/core/cgimega.c").read_text())
+mega = mega[
+    mega.index("typedef struct {uint32_t address;unsigned remaining;} MegaRead;") : mega.index(
+        "void ICACHE_FLASH_ATTR sendReadFuseQuery"
+    )
+]
+run(
+    "mega-read",
+    HTTP
+    + r"""
 static ETSTimer optibootTimer;static HttpdConnData *readOwner;static unsigned uartCalls;
 static void megaUartRecv(char *p,short n){(void)p;(void)n;}
 static void (*programmingCB)(char*,short)=megaUartRecv;
@@ -223,7 +314,9 @@ static bool reply_ok;
 static void readLoadAddressReply(void){reply_ok=true;}
 static void sendReadFlashQuery(unsigned count){assert(count<=16);uartCalls++;}
 static void readReadFlashReply(char *p,unsigned count){memset(p,0x55,count);reply_ok=true;}
-'''+mega,r'''
+"""
+    + mega,
+    r"""
 const CmdList commands[]={{0,0,0}};
 int main(void){struct espconn socket={0};HttpdConnData c={.conn=&socket,.requestType=HTTPD_METHOD_POST,.url="/pgmmega/read/0,11"};assert(deviceOperationBegin(&optibootTimer));
  strcpy(guard,"");cgiMegaRead(&c);assert(code==415&&!uartCalls);strcpy(guard,"1");c.requestType=HTTPD_METHOD_GET;cgiMegaRead(&c);assert(code==405&&!uartCalls);c.requestType=HTTPD_METHOD_POST;
@@ -232,12 +325,27 @@ int main(void){struct espconn socket={0};HttpdConnData c={.conn=&socket,.request
  assert(cgiMegaRead(&c)==HTTPD_CGI_MORE);assert(cgiMegaRead(&c)==HTTPD_CGI_DONE);assert(outputUsed==73&&!allocations&&!c.cgiPrivData&&!readOwner);
  assert(cgiMegaRead(&c)==HTTPD_CGI_MORE);unsigned prior=uartCalls;c.conn=NULL;cgiMegaRead(&c);assert(!allocations&&!readOwner&&uartCalls==prior);deviceOperationEnd(&optibootTimer);
  puts("PASS actual Mega readback: mutation guards, zero/partial ranges, exact bounded rows and abort cleanup");}
-''')
-syslog=(ROOT/'src/syslog/syslog.c').read_text()
-sent=syslog[syslog.index('static void ICACHE_FLASH_ATTR syslog_udp_sent_cb(void *arg)\n{'):syslog.index('static void ICACHE_FLASH_ATTR\nsyslog_udp_send_event')]
-dns=syslog[syslog.index('static void ICACHE_FLASH_ATTR syslog_gethostbyname_cb('):syslog.index(' /******************************************************************************\n  * FunctionName : initSyslog')]
-init=syslog[syslog.index('void ICACHE_FLASH_ATTR syslog_init('):syslog.index('/******************************************************************************\n * FunctionName : syslog_add_entry')]
-run('syslog-config',r'''
+""",
+)
+syslog = SourceText((ROOT / "src/syslog/syslog.c").read_text())
+sent = syslog[
+    syslog.index("static void ICACHE_FLASH_ATTR syslog_udp_sent_cb(void *arg)\n{") : syslog.index(
+        "static void ICACHE_FLASH_ATTR\nsyslog_udp_send_event"
+    )
+]
+dns = syslog[
+    syslog.index("static void ICACHE_FLASH_ATTR syslog_gethostbyname_cb(") : syslog.index(
+        " /******************************************************************************\n  * FunctionName : initSyslog"
+    )
+]
+init = syslog[
+    syslog.index("void ICACHE_FLASH_ATTR syslog_init(") : syslog.index(
+        "/******************************************************************************\n * FunctionName : syslog_add_entry"
+    )
+]
+run(
+    "syslog-config",
+    r"""
 #include "config.h"
 #include "syslog.h"
 #define IPSTR "%u.%u.%u.%u"
@@ -252,7 +360,11 @@ static void syslog_chk_status(void){}
 static void syslog_udp_send_event(void *p){(void)p;}
 static unsigned register_usr_task(void (*f)(void*)){(void)f;return 0;}
 #define syslog_send_udp() ((void)0)
-'''+sent+dns+init,r'''
+"""
+    + sent
+    + dns
+    + init,
+    r"""
 const CmdList commands[]={{0,0,0}};
 int main(void){syslog_init(NULL);syslog_init("");assert(!allocations);
  syslog_init("1.2.3.4:5514");assert(syslogHost.port==5514&&allocations==2);syslog_init("1.2.3.4");assert(syslogHost.port==514&&allocations==2);
@@ -262,10 +374,15 @@ int main(void){syslog_init(NULL);syslog_init("");assert(!allocations);
  syslog_udp_sent_cb(old);assert(!syslog_espconn&&!syslogQueue&&!allocations&&syslogState==SYSLOG_HALTED);
  syslog_init("test:5514");assert(syslog_dns_pending);unsigned query=dnsCount-1;syslog_init("");assert(syslog_reconfigure&&allocations==2);resolved(query,false);assert(!allocations&&!syslog_espconn);
  puts("PASS actual syslog configuration: default-port reset, null/empty disable, allocation rollback, deferred send/DNS cleanup");}
-''')
+""",
+)
 # Complete multipart parser + actual upload-owner wrapper, with flash writes represented by callbacks.
-page=(ROOT/'src/core/cgiwebserversetup.c').read_text();page=page[page.index('static MultipartCtx *webServerContext;'):page.rindex('#endif')]
-run('page-owner',HTTP+r'''
+page = SourceText((ROOT / "src/core/cgiwebserversetup.c").read_text())
+page = page[page.index("static MultipartCtx *webServerContext;") : page.rindex("#endif")]
+run(
+    "page-owner",
+    HTTP
+    + r"""
 #include "multipart.h"
 #include "multipart.c"
 static unsigned serialClients,files,bytes;
@@ -275,7 +392,9 @@ static bool serialInputPending(void){return false;}
 static unsigned serbridge_client_count(void){return serialClients;}
 void errorResponse(HttpdConnData *c,int n,char *message){(void)message;noCacheHeaders(c,n);}
 static int webServerSetupMultipartCallback(MultipartCmd cmd,char *data,int n,int position){(void)data;(void)position;if(cmd==FILE_START)files++;if(cmd==FILE_DATA)bytes+=n;return 0;}
-'''+page,r'''
+"""
+    + page,
+    r"""
 const CmdList commands[]={{0,0,0}};
 int main(void){struct espconn socket={0};HttpdPostData p={0};HttpdConnData c={.conn=&socket,.post=&p,.requestType=HTTPD_METHOD_POST};
  char body[]="--boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"x.txt\"\r\n\r\nhello\r\n--boundary--\r\n";
@@ -287,4 +406,5 @@ int main(void){struct espconn socket={0};HttpdPostData p={0};HttpdConnData c={.c
  assert(cgiWebServerSetupUpload(&c)==HTTPD_CGI_DONE&&code==204&&!webServerUploadBusy()&&!deviceOperationBusy()&&files==1&&bytes==5&&!allocations);
  serialClients=0;p.buff=body;p.buffLen=p.received=40;assert(cgiWebServerSetupUpload(&c)==HTTPD_CGI_MORE);c.conn=NULL;cgiWebServerSetupUpload(&c);assert(!deviceOperationBusy()&&!webServerUploadBusy()&&!allocations);
  puts("PASS actual multipart upload: exclusive owner, interleaved serial activity, concurrent rejection and completion/abort cleanup");}
-''')
+""",
+)

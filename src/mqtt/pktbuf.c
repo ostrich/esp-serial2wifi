@@ -18,12 +18,11 @@
 //}
 #endif
 
-
-PktBuf * ICACHE_FLASH_ATTR
-PktBuf_New(uint16_t length) {
-  PktBuf *buf = os_zalloc(length+sizeof(PktBuf));
-  if(!buf)return NULL;
-  buf->references=1;
+PktBuf *ICACHE_FLASH_ATTR PktBuf_New(uint16_t length) {
+  PktBuf *buf = os_zalloc(length + sizeof(PktBuf));
+  if (!buf)
+    return NULL;
+  buf->references = 1;
   buf->next = NULL;
   buf->filled = 0;
   //os_printf("PktBuf_New: %p l=%d->%d d=%p\n",
@@ -31,41 +30,44 @@ PktBuf_New(uint16_t length) {
   return buf;
 }
 
-PktBuf * ICACHE_FLASH_ATTR
-PktBuf_Push(PktBuf *headBuf, PktBuf *buf) {
+PktBuf *ICACHE_FLASH_ATTR PktBuf_Push(PktBuf *headBuf, PktBuf *buf) {
   if (headBuf == NULL) {
     //os_printf("PktBuf_Push: %p\n", buf);
     return buf;
   }
   PktBuf *h = headBuf;
-  while (h->next != NULL) h = h->next;
+  while (h->next != NULL)
+    h = h->next;
   h->next = buf;
   //os_printf("PktBuf_Push: %p->..->%p\n", headBuf, buf);
   return headBuf;
 }
 
-PktBuf * ICACHE_FLASH_ATTR
-PktBuf_Unshift(PktBuf *headBuf, PktBuf *buf) {
+PktBuf *ICACHE_FLASH_ATTR PktBuf_Unshift(PktBuf *headBuf, PktBuf *buf) {
   buf->next = headBuf;
   //os_printf("PktBuf_Unshift: %p->%p\n", buf, buf->next);
   return buf;
 }
 
-PktBuf * ICACHE_FLASH_ATTR
-PktBuf_Shift(PktBuf *headBuf) {
+PktBuf *ICACHE_FLASH_ATTR PktBuf_Shift(PktBuf *headBuf) {
   PktBuf *buf = headBuf->next;
   headBuf->next = NULL;
   //os_printf("PktBuf_Shift: (%p)->%p\n", headBuf, buf);
   return buf;
 }
 
-PktBuf * ICACHE_FLASH_ATTR
-PktBuf_ShiftFree(PktBuf *headBuf) {
+PktBuf *ICACHE_FLASH_ATTR PktBuf_ShiftFree(PktBuf *headBuf) {
   PktBuf *buf = headBuf->next;
   //os_printf("PktBuf_ShiftFree: (%p)->%p\n", headBuf, buf);
   PktBuf_Release(headBuf);
   return buf;
 }
 
-void ICACHE_FLASH_ATTR PktBuf_Retain(PktBuf *p){if(p)p->references++;}
-void ICACHE_FLASH_ATTR PktBuf_Release(PktBuf *p){if(p&&!--p->references)os_free(p);}
+void ICACHE_FLASH_ATTR PktBuf_Retain(PktBuf *p) {
+  if (p)
+    p->references++;
+}
+void ICACHE_FLASH_ATTR PktBuf_Release(PktBuf *p) {
+  if (p && !--p->references)
+    os_free(p);
+}

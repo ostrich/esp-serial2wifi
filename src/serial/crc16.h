@@ -54,7 +54,7 @@
 
 #ifndef CRC16_H_
 #define CRC16_H_
-#ifdef	__cplusplus
+#ifdef __cplusplus
 extern "C" {
 #endif
 /**
@@ -89,9 +89,8 @@ unsigned short crc16_add(unsigned char b, unsigned short crc);
  *             well as a table-driven algorithm when checksumming an
  *             entire data block.
  */
-unsigned short crc16_data(const unsigned char *data, int datalen,
-			  unsigned short acc);
-#ifdef	__cplusplus
+unsigned short crc16_data(const unsigned char *data, int datalen, unsigned short acc);
+#ifdef __cplusplus
 }
 #endif
 #endif /* CRC16_H_ */
