@@ -53,6 +53,31 @@ update, disconnect ESP TX from the attached device or put that device in a safe
 state. See the [user guide](docs/user-guide.md) for wiring, networking, terminal
 behavior and optional features.
 
+## Improvements over esp-link
+
+ESP Serial2WiFi builds on [esp-link](https://github.com/jeelabs/esp-link)’s serial bridge and MCU integrations, with
+substantial changes to everyday use, reliability and development:
+
+- **Interactive browser terminal.** xterm.js renders terminal controls and sends
+  keystrokes immediately. Recent buffered output appears in the same terminal;
+  raw text and hex tools support devices that do not use terminal emulation.
+- **Redesigned web interface.** Responsive pages, light/dark themes, clearer
+  settings and save verification. Network setup separates standalone Wi-Fi from
+  joining a router, and lets you change the standalone AP’s IP address.
+- **More resilient serial transport.** Revised buffering, send-credit handling
+  and retransmission timing address TCP/Wi-Fi stalls. Temporary output stalls
+  can recover without immediately closing the connection; Telnet negotiation
+  handles interactive input and eight-bit serial data.
+- **Better diagnostics.** Separate UART, TCP and browser-output error counters,
+  recent error changes, device logs and redacted diagnostic downloads make
+  connection problems easier to investigate.
+- **Stronger update and programming checks.** Firmware uploads validate image
+  structure, integrity and target slot before activation. The browser MCU
+  programmer validates Intel HEX files and verifies Optiboot flash readback.
+- **Simpler builds and releases.** Python 3 tooling, one-command dependency setup,
+  pinned build inputs and Git-derived versions. Automated host/browser checks
+  and GitHub Actions produce downloadable 512 KB and 4 MB release archives.
+
 ## Contribute
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and the
