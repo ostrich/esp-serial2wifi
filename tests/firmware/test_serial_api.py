@@ -169,10 +169,21 @@ subprocess.run(
         "-Wno-ignored-qualifiers",
         *[
             "-I" + str(ROOT / p)
-            for p in ["tests/support/api-stubs", "src/core", "src/httpd", "src/serial", "include"]
+            for p in [
+                "tests/support/api-stubs",
+                "src/core",
+                "src/api",
+                "src/wifi",
+                "src/flash",
+                "src/programmer",
+                "src/custom_pages",
+                "src/httpd",
+                "src/serial",
+                "include",
+            ]
         ],
         str(OUT / "test.c"),
-        str(ROOT / "src/core/api_json.c"),
+        str(ROOT / "src/api/api_json.c"),
         "-o",
         str(OUT / "test"),
     ],

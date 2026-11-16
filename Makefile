@@ -33,6 +33,7 @@ MCU_ISP_PIN ?= -1
 LED_CONN_PIN ?= -1
 LED_SERIAL_PIN ?= -1
 CHIP_IN_HOSTNAME ?= 1
+# Optional feature names; mk/firmware.mk maps these to source directories.
 MODULES ?= mqtt rest socket web-server syslog
 CHANGE_TO_STA ?= yes
 GZIP_COMPRESSION ?= yes

@@ -9,7 +9,7 @@
 #include "espfsformat.h"
 #include "config.h"
 #include "flash_layout.h"
-#include "web-server.h"
+#include "custom_pages.h"
 #include "api_request.h"
 #include "operation.h"
 #include "serbridge.h"

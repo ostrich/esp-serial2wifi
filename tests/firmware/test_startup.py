@@ -25,6 +25,7 @@ for target in flash_layout.TARGETS:
                 "-Wextra",
                 "-Werror",
                 "-I" + str(work),
+                "-I" + str(ROOT / "src/flash"),
                 "-c",
                 str(ROOT / "src/core/startup.c"),
                 "-o",

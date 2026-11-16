@@ -163,17 +163,36 @@ scripts or adding one-file wrappers around existing commands.
 
 ## Code and storage layout
 
-| Location                            | Purpose                                                                              |
-| ----------------------------------- | ------------------------------------------------------------------------------------ |
-| `src/core/`                         | Configuration, Wi-Fi, versioned API, flash and updates                               |
-| `src/serial/`                       | UART, capture, TCP/Telnet, SLIP and SDK transport overrides                          |
-| Other `src/` modules                | HTTP server, ESPFS, MCU commands, MQTT, HTTP/socket clients, custom pages and syslog |
-| `include/`                          | Shared platform headers                                                              |
-| `web/app/`                          | Browser interface                                                                    |
-| `web/custom-pages/`, `web/artwork/` | MCU page helpers and icon source                                                     |
-| `third_party/`                      | Vendored terminal distributions and notices                                          |
-| `tools/`, `mk/`                     | Setup, asset/image generation, packaging, flashing and build rules                   |
-| `tests/`                            | Native/browser tests, stubs and synthetic fixtures                                   |
+| Location                            | Purpose                                                                        |
+| ----------------------------------- | ------------------------------------------------------------------------------ |
+| `src/core/`                         | Startup, configuration, task scheduling, logging and shared device state       |
+| `src/api/`                          | Management HTTP endpoints, JSON/request helpers and ordered route registration |
+| `src/wifi/`                         | Wi-Fi setup, recovery, AP and network configuration helpers                    |
+| `src/flash/`                        | Flash layout, firmware validation, OTA writing and UI storage                  |
+| `src/programmer/`                   | Optiboot, Mega/STK500 and programming record processing                        |
+| `src/custom_pages/`                 | Custom-page uploads, discovery and browser-to-MCU callbacks                    |
+| `src/httpd/`                        | HTTP server, multipart parser and ESPFS serving adapters                       |
+| `src/espfs/`                        | Flash filesystem reader                                                        |
+| `src/serial/`                       | UART, capture, TCP/Telnet, SLIP and SDK transport overrides                    |
+| `src/mcu_commands/`                 | MCU command framing, dispatch and callbacks                                    |
+| `src/mqtt/`                         | MQTT protocol, configured client and MCU commands                              |
+| `src/http_client/`                  | Outbound HTTP requests for the attached MCU                                    |
+| `src/socket/`, `src/syslog/`        | Socket integration and remote logging                                          |
+| `include/`                          | Shared platform headers                                                        |
+| `web/app/`                          | Browser interface                                                              |
+| `web/custom-pages/`, `web/artwork/` | MCU page helpers and icon source                                               |
+| `third_party/`                      | Vendored terminal distributions and notices                                    |
+| `tools/`, `mk/`                     | Setup, asset/image generation, packaging, flashing and build rules             |
+| `tests/`                            | Native/browser tests, stubs and synthetic fixtures                             |
+
+`MODULES` selects optional features using the existing names `mqtt`, `rest`,
+`socket`, `web-server` and `syslog`; these are independent of source directory
+names. For example, `rest` enables `http_client/`, and `web-server` enables
+`custom_pages/`. The management HTTP server remains available without custom
+pages. `mk/firmware.mk` maps these feature names to source directories.
+Headers stay beside their implementations. Keep route order in `api/routes.c`:
+specific endpoints precede wildcard handlers. Files with mixed responsibilities
+remain intact until a separate behavior change calls for splitting them.
 
 The Non-OS SDK runs cooperative callbacks. Keep UART/TCP work bounded and retain
 transmit buffers until copied or acknowledged. Build-time symbol rewriting

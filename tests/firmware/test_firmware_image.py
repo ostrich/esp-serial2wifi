@@ -54,7 +54,7 @@ class ImageTests(unittest.TestCase):
 """)
         (cls.work / "test.c").write_text(
             '#include "'
-            + str(ROOT / "src/core/firmware_image.c")
+            + str(ROOT / "src/flash/firmware_image.c")
             + '"\n'
             + r"""
 int main(int argc,char **argv) {

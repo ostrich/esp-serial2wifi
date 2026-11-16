@@ -9,9 +9,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / ".build-tests/page-menu"
 OUT.mkdir(parents=True, exist_ok=True)
-s = SourceText((ROOT / "src/web-server/web-server.c").read_text())
+s = SourceText((ROOT / "src/custom_pages/custom_pages.c").read_text())
 body = s[s.index("char * webServerPages") : s.index("// initializer")]
-cgi = SourceText((ROOT / "src/core/cgi.c").read_text())
+cgi = SourceText((ROOT / "src/api/cgi.c").read_text())
 formatter = cgi[
     cgi.index("static void ICACHE_FLASH_ATTR pageMenu(") : cgi.index(
         "int ICACHE_FLASH_ATTR cgiMenu("
@@ -61,10 +61,20 @@ subprocess.run(
         "-Wno-ignored-qualifiers",
         *[
             "-I" + str(ROOT / p)
-            for p in ["tests/support/api-stubs", "src/core", "src/mqtt", "include"]
+            for p in [
+                "tests/support/api-stubs",
+                "src/core",
+                "src/api",
+                "src/wifi",
+                "src/flash",
+                "src/programmer",
+                "src/custom_pages",
+                "src/mqtt",
+                "include",
+            ]
         ],
         str(OUT / "test.c"),
-        str(ROOT / "src/core/api_json.c"),
+        str(ROOT / "src/api/api_json.c"),
         "-o",
         str(OUT / "test"),
     ],

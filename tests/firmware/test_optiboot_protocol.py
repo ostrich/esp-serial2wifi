@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / ".build-tests/optiboot-protocol"
 OUT.mkdir(parents=True, exist_ok=True)
 s = SourceText(
-    (Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "src/core/cgioptiboot.c").read_text()
+    (Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "src/programmer/cgioptiboot.c").read_text()
 )
 globals = s[s.index("static enum {") : s.index("#define MAX_SAVED")]
 receive = s[s.index("// skip in-sync responses") :]
@@ -73,6 +73,11 @@ subprocess.run(
         "-funsigned-char",
         "-fsanitize=address,undefined",
         "-I" + str(ROOT / "src/core"),
+        "-I" + str(ROOT / "src/api"),
+        "-I" + str(ROOT / "src/wifi"),
+        "-I" + str(ROOT / "src/flash"),
+        "-I" + str(ROOT / "src/programmer"),
+        "-I" + str(ROOT / "src/custom_pages"),
         str(OUT / "test.c"),
         "-o",
         str(OUT / "test"),

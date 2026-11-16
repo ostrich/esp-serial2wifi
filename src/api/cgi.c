@@ -18,7 +18,7 @@ Some random cgi routines.
 #include "config.h"
 #include "api_request.h"
 #ifdef WEBSERVER
-#include "web-server.h"
+#include "custom_pages.h"
 #endif
 
 #ifdef CGI_DBG

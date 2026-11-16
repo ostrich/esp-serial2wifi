@@ -1,5 +1,5 @@
-#ifndef WEB_SERVER_H
-#define WEB_SERVER_H
+#ifndef CUSTOM_PAGES_H
+#define CUSTOM_PAGES_H
 
 #include <esp8266.h>
 
@@ -32,4 +32,4 @@ int WEB_CgiJsonHook(HttpdConnData *connData);
 void WEB_Setup(CmdPacket *cmd);
 void WEB_Data(CmdPacket *cmd);
 
-#endif /* WEB_SERVER_H */
+#endif /* CUSTOM_PAGES_H */

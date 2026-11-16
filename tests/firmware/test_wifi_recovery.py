@@ -9,7 +9,7 @@ import subprocess, os
 ROOT = Path(__file__).resolve().parents[2]
 BUILD = ROOT / ".build-tests/wifi-recovery"
 BUILD.mkdir(parents=True, exist_ok=True)
-cgi = SourceText((ROOT / "src/core/cgiwifi.c").read_text())
+cgi = SourceText((ROOT / "src/wifi/cgiwifi.c").read_text())
 recovery = cgi[
     cgi.index("static void ICACHE_FLASH_ATTR resetTimerCb(") : cgi.index(
         "// Reassociate timer to delay change"
@@ -103,6 +103,11 @@ subprocess.run(
         "-fsanitize=address,undefined",
         "-I" + str(ROOT / "tests/support/api-stubs"),
         "-I" + str(ROOT / "src/core"),
+        "-I" + str(ROOT / "src/api"),
+        "-I" + str(ROOT / "src/wifi"),
+        "-I" + str(ROOT / "src/flash"),
+        "-I" + str(ROOT / "src/programmer"),
+        "-I" + str(ROOT / "src/custom_pages"),
         str(BUILD / "test.c"),
         "-o",
         str(BUILD / "test"),

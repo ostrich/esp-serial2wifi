@@ -138,7 +138,17 @@ subprocess.run(
         "-fsanitize=address,undefined",
         *[
             "-I" + str(ROOT / p)
-            for p in ["tests/support/api-stubs", "src/core", "src/serial", "include"]
+            for p in [
+                "tests/support/api-stubs",
+                "src/core",
+                "src/api",
+                "src/wifi",
+                "src/flash",
+                "src/programmer",
+                "src/custom_pages",
+                "src/serial",
+                "include",
+            ]
         ],
         str(OUT / "test.c"),
         "-o",

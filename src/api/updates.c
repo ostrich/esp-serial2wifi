@@ -9,7 +9,7 @@
 #include "serial_api.h"
 #ifdef WEBSERVER
 #include "cgiwebserversetup.h"
-#include "web-server.h"
+#include "custom_pages.h"
 #include "espfsformat.h"
 #endif
 extern char *firmwareVersion;

@@ -108,7 +108,7 @@ void cmdResponseStart(uint16_t cmd,uint32_t value,uint16_t argc){(void)cmd;respo
 void cmdResponseBody(const void *p,uint16_t n){assert(responseAt<8&&n<2048);memcpy(responseData[responseAt],p,n);responseLengths[responseAt++]=n;}
 void cmdResponseEnd(void){}
 """
-cmd = SourceText((ROOT / "src/cmd/cmd.c").read_text())
+cmd = SourceText((ROOT / "src/mcu_commands/cmd.c").read_text())
 COMMON += cmd[cmd.index("// Execute a parsed command") :]
 COMMON += r"""
 typedef struct {const void *data;unsigned n;} Arg;
@@ -121,7 +121,7 @@ static void request(unsigned command,unsigned value,unsigned argc,const Arg *arg
 
 def run(name, module, test, extra=""):
     for file, directory in [
-        ("rest.c", "rest"),
+        ("rest.c", "http_client"),
         ("socket.c", "socket"),
         ("mqtt.c", "mqtt"),
         ("pktbuf.c", "mqtt"),
@@ -154,13 +154,17 @@ def run(name, module, test, extra=""):
                 "-I" + str(p)
                 for p in (
                     OUT,
-                    ROOT / "src/cmd",
+                    ROOT / "src/mcu_commands",
                     ROOT / "src/core",
+                    ROOT / "src/api",
+                    ROOT / "src/wifi",
+                    ROOT / "src/flash",
+                    ROOT / "src/programmer",
+                    ROOT / "src/custom_pages",
                     ROOT / "src/mqtt",
-                    ROOT / "src/rest",
+                    ROOT / "src/http_client",
                     ROOT / "src/socket",
                     ROOT / "src/httpd",
-                    ROOT / "src/web-server",
                     ROOT / "src/syslog",
                 )
             ],
@@ -269,7 +273,7 @@ void httpdEndHeaders(HttpdConnData *c){(void)c;}
 int httpdSend(HttpdConnData *c,const char *p,int n){(void)c;if(n<0)n=strlen(p);if(outputUsed+n>2600)return 0;memcpy(httpOutput+outputUsed,p,n);outputUsed+=n;httpOutput[outputUsed]=0;return 1;}
 int httpdGetHeader(HttpdConnData *c,char *name,char *out,int n){(void)c;snprintf(out,n,"%s",!strcmp(name,"X-Serial2WiFi-Request")?guard:"application/x-www-form-urlencoded");return 1;}
 """
-web = SourceText((ROOT / "src/web-server/web-server.c").read_text())
+web = SourceText((ROOT / "src/custom_pages/custom_pages.c").read_text())
 web = web[
     web.index("static void ICACHE_FLASH_ATTR webResponse(") : web.index(
         "// this method is responsible for the MCU"
@@ -277,7 +281,7 @@ web = web[
 ]
 run(
     "web-response",
-    HTTP + '\n#include "web-server.h"\n' + web,
+    HTTP + '\n#include "custom_pages.h"\n' + web,
     r"""
 const CmdList commands[]={{0,0,0}};
 int main(void){
@@ -293,7 +297,7 @@ int main(void){
  assert(!allocations);puts("PASS actual custom-page JSON: escaped expansion, field names/control bytes, typed length refusal and negative fractions");}
 """,
 )
-mega = SourceText((ROOT / "src/core/cgimega.c").read_text())
+mega = SourceText((ROOT / "src/programmer/cgimega.c").read_text())
 mega = mega[
     mega.index("typedef struct {uint32_t address;unsigned remaining;} MegaRead;") : mega.index(
         "void ICACHE_FLASH_ATTR sendReadFuseQuery"
@@ -377,7 +381,7 @@ int main(void){syslog_init(NULL);syslog_init("");assert(!allocations);
 """,
 )
 # Complete multipart parser + actual upload-owner wrapper, with flash writes represented by callbacks.
-page = SourceText((ROOT / "src/core/cgiwebserversetup.c").read_text())
+page = SourceText((ROOT / "src/custom_pages/cgiwebserversetup.c").read_text())
 page = page[page.index("static MultipartCtx *webServerContext;") : page.rindex("#endif")]
 run(
     "page-owner",

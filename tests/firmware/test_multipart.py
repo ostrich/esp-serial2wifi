@@ -67,7 +67,10 @@ subprocess.run(
         "-Werror",
         "-Wno-misleading-indentation",
         "-Wno-ignored-qualifiers",
-        *["-I" + str(ROOT / p) for p in ["tests/support/api-stubs", "src/httpd", "src/core"]],
+        *[
+            "-I" + str(ROOT / p)
+            for p in ["tests/support/api-stubs", "src/httpd", "src/core", "src/api"]
+        ],
         str(OUT / "test.c"),
         "-o",
         str(OUT / "test"),

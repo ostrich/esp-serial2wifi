@@ -48,28 +48,31 @@ TARGET		= esp-serial2wifi
 CFLAGS=
 
 # set defines for optional modules
-ifneq (,$(findstring mqtt,$(MODULES)))
+ifneq (,$(filter mqtt,$(MODULES)))
 	CFLAGS		+= -DMQTT
 endif
 
-ifneq (,$(findstring rest,$(MODULES)))
+ifneq (,$(filter rest,$(MODULES)))
 	CFLAGS		+= -DREST
 endif
 
-ifneq (,$(findstring syslog,$(MODULES)))
+ifneq (,$(filter syslog,$(MODULES)))
 	CFLAGS		+= -DSYSLOG
 endif
 
-ifneq (,$(findstring web-server,$(MODULES)))
+ifneq (,$(filter web-server,$(MODULES)))
 	CFLAGS		+= -DWEBSERVER
 endif
 
-ifneq (,$(findstring socket,$(MODULES)))
+ifneq (,$(filter socket,$(MODULES)))
 	CFLAGS		+= -DSOCKET
 endif
 
-# which modules (subdirectories) of the project to include in compiling
-override MODULES += espfs httpd serial cmd core
+# MODULES selects optional features; source directory names are independent.
+SOURCE_MODULES := core api wifi flash programmer espfs httpd serial mcu_commands
+SOURCE_MODULES += $(filter mqtt socket syslog,$(MODULES))
+SOURCE_MODULES += $(if $(filter rest,$(MODULES)),http_client)
+SOURCE_MODULES += $(if $(filter web-server,$(MODULES)),custom_pages)
 EXTRA_INCDIR 	= include . build
 
 # libraries used in this project, mainly provided by the SDK
@@ -105,7 +108,7 @@ OBJDP		:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-objdump
 ELF_SIZE	:= $(XTENSA_TOOLS_ROOT)xtensa-lx106-elf-size
 
 ####
-SRC_DIR		:= $(addprefix src/,$(MODULES))
+SRC_DIR		:= $(addprefix src/,$(SOURCE_MODULES))
 BUILD_DIR	:= $(addprefix $(BUILD_BASE)/,$(SRC_DIR))
 
 SDK_LIBDIR	:= $(addprefix $(SDK_BASE)/,$(SDK_LIBDIR))

@@ -14,13 +14,13 @@
 #include <rest.h>
 #endif
 #ifdef WEBSERVER
-#include <web-server.h>
+#include <custom_pages.h>
 #endif
 #ifdef SOCKET
 #include <socket.h>
 #endif
 #include <ip_addr.h>
-#include "src/core/cgi.h"
+#include "src/api/cgi.h"
 
 #include "config.h"
 

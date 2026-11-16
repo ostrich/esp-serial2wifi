@@ -121,7 +121,9 @@ with tempfile.TemporaryDirectory(dir=PRIVATE) as name:
     (work / "httpd.h").write_text(HTTP)
     (work / "generated_flash_layout.h").write_text(flash_layout.header(flash_layout.layout("4MB")))
     includes = "".join(
-        '#include "' + str(ROOT / "src/core" / file) + '"\n'
+        '#include "'
+        + str(ROOT / ("src/core" if file == "operation.c" else "src/flash") / file)
+        + '"\n'
         for file in ("operation.c", "flash_layout.c", "firmware_image.c", "cgiflash.c")
     )
     (work / "test.c").write_text(includes + TEST)
@@ -140,6 +142,8 @@ with tempfile.TemporaryDirectory(dir=PRIVATE) as name:
                 "-I" + str(work),
                 "-I" + str(ROOT / "tests/support/api-stubs"),
                 "-I" + str(ROOT / "src/serial"),
+                "-I" + str(ROOT / "src/api"),
+                "-I" + str(ROOT / "src/core"),
                 str(work / "test.c"),
                 "-o",
                 str(work / "test"),
@@ -173,6 +177,8 @@ with tempfile.TemporaryDirectory(dir=PRIVATE) as name:
                 "-I" + str(work),
                 "-I" + str(ROOT / "tests/support/api-stubs"),
                 "-I" + str(ROOT / "src/serial"),
+                "-I" + str(ROOT / "src/api"),
+                "-I" + str(ROOT / "src/core"),
                 str(work / "test.c"),
                 "-o",
                 str(work / "test"),

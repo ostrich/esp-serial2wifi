@@ -9,9 +9,9 @@ import os, re, subprocess
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / ".build-tests/optiboot-readback"
 OUT.mkdir(parents=True, exist_ok=True)
-s = SourceText((ROOT / "src/core/cgioptiboot.c").read_text())
+s = SourceText((ROOT / "src/programmer/cgioptiboot.c").read_text())
 functions = s[s.index("// Poll UART for ACKs") : s.index("//===== Rebooting and getting sync")]
-h = SourceText((ROOT / "src/core/pgmshared.h").read_text())
+h = SourceText((ROOT / "src/programmer/pgmshared.h").read_text())
 record = re.search(r"extern struct optibootData \{.*?\} \*optibootData;", h, re.S).group()
 source = (
     r"""
@@ -96,6 +96,11 @@ subprocess.run(
         "-Werror",
         "-fsanitize=address,undefined",
         "-I" + str(ROOT / "src/core"),
+        "-I" + str(ROOT / "src/api"),
+        "-I" + str(ROOT / "src/wifi"),
+        "-I" + str(ROOT / "src/flash"),
+        "-I" + str(ROOT / "src/programmer"),
+        "-I" + str(ROOT / "src/custom_pages"),
         str(OUT / "test.c"),
         "-o",
         str(OUT / "test"),

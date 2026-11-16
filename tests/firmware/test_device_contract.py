@@ -29,7 +29,7 @@ static bool wifi_softap_set_config(struct softap_config *config){saved=*config;a
 """)
 (OUT / "test.c").write_text(
     '#include <esp8266.h>\n#include "'
-    + str(ROOT / "src/core/wifi_setup.c")
+    + str(ROOT / "src/wifi/wifi_setup.c")
     + '"\n'
     + r"""
 int main(void){
@@ -77,7 +77,7 @@ print(
 
 OUT = ROOT / ".build-tests/project-boundary"
 OUT.mkdir(parents=True, exist_ok=True)
-source = SourceText((ROOT / "src/core/api_request.c").read_text())
+source = SourceText((ROOT / "src/api/api_request.c").read_text())
 body = source[
     source.index("bool ICACHE_FLASH_ATTR apiRead(") : source.index(
         "static int ICACHE_FLASH_ATTR hex("

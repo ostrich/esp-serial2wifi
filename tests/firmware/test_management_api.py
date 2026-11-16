@@ -140,6 +140,11 @@ for mqtt in [False, True]:
                         for p in [
                             "tests/support/api-stubs",
                             "src/core",
+                            "src/api",
+                            "src/wifi",
+                            "src/flash",
+                            "src/programmer",
+                            "src/custom_pages",
                             "src/httpd",
                             "src/serial",
                             "include",
@@ -150,8 +155,8 @@ for mqtt in [False, True]:
                 ]
             ],
             str(OUT / "test.c"),
-            str(ROOT / "src/core/api_json.c"),
-            str(ROOT / "src/core/network_config.c"),
+            str(ROOT / "src/api/api_json.c"),
+            str(ROOT / "src/wifi/network_config.c"),
             "-o",
             str(binary),
         ],

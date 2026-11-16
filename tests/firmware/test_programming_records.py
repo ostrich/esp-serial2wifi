@@ -9,10 +9,10 @@ import os, subprocess, sys, re
 ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / ".build-tests/programming-records"
 OUT.mkdir(parents=True, exist_ok=True)
-path = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "src/core/pgmshared.c"
+path = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "src/programmer/pgmshared.c"
 s = SourceText(path.read_text())
 body = s[s.index("struct optibootData *optibootData;") :]
-h = SourceText((ROOT / "src/core/pgmshared.h").read_text())
+h = SourceText((ROOT / "src/programmer/pgmshared.h").read_text())
 record = re.search(r"extern struct optibootData \{.*?\} \*optibootData;", h, re.S).group()
 source = (
     r"""

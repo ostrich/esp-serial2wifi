@@ -18,7 +18,7 @@ http_headers = http[
         "//ToDo: sprintf->snprintf"
     )
 ]
-cgi = SourceText((ROOT / "src/core/cgi.c").read_text())
+cgi = SourceText((ROOT / "src/api/cgi.c").read_text())
 cache_headers = cgi[
     cgi.index("void ICACHE_FLASH_ATTR noCacheHeaders(") : cgi.index(
         "void ICACHE_FLASH_ATTR jsonHeader("
@@ -186,13 +186,18 @@ for enabled in (False, True):
         "-fno-omit-frame-pointer",
         "-I" + str(ROOT / "tests/support/api-stubs"),
         "-I" + str(ROOT / "src/core"),
+        "-I" + str(ROOT / "src/api"),
+        "-I" + str(ROOT / "src/wifi"),
+        "-I" + str(ROOT / "src/flash"),
+        "-I" + str(ROOT / "src/programmer"),
+        "-I" + str(ROOT / "src/custom_pages"),
         "-I" + str(ROOT / "src/httpd"),
         "-I" + str(ROOT / "src/serial"),
         "-I" + str(ROOT / "include"),
         "-I" + str(ROOT / "src/mqtt"),
         "-I" + str(ROOT / "build"),
         str(path),
-        str(ROOT / "src/core/api_json.c"),
+        str(ROOT / "src/api/api_json.c"),
         "-o",
         str(binary),
     ]

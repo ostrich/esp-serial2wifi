@@ -89,7 +89,7 @@ static bool system_partition_table_regist(const partition_item_t *p,uint32_t n,u
 """)
     includes = "\n".join(
         "#include " + json.dumps(str(source / p))
-        for p in ("src/serial/crc16.c", "src/core/flash_layout.c", "src/core/config.c")
+        for p in ("src/serial/crc16.c", "src/flash/flash_layout.c", "src/core/config.c")
     )
     code = (
         includes
@@ -180,6 +180,11 @@ int main(void) {
                 "-fsanitize=address,undefined",
                 "-I" + str(out),
                 "-I" + str(source / "src/core"),
+                "-I" + str(source / "src/api"),
+                "-I" + str(source / "src/wifi"),
+                "-I" + str(source / "src/flash"),
+                "-I" + str(source / "src/programmer"),
+                "-I" + str(source / "src/custom_pages"),
                 "-I" + str(source / "src/espfs"),
                 "-I" + str(source / "include"),
                 "-I" + str(source / "src/serial"),

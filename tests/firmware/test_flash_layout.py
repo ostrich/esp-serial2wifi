@@ -87,7 +87,7 @@ class LayoutTests(unittest.TestCase):
                     flash_layout.header(flash_layout.layout(target))
                 )
                 (temp / "test.c").write_text(
-                    '#include "' + str(ROOT / "src/core/flash_layout.c") + '"\n' + TEST
+                    '#include "' + str(ROOT / "src/flash/flash_layout.c") + '"\n' + TEST
                 )
                 subprocess.run(
                     [
@@ -108,7 +108,7 @@ class LayoutTests(unittest.TestCase):
                 subprocess.run([str(temp / "test")], check=True)
 
     def test_actual_custom_page_writer(self):
-        source = SourceText((ROOT / "src/core/cgiwebserversetup.c").read_text())
+        source = SourceText((ROOT / "src/custom_pages/cgiwebserversetup.c").read_text())
         start = source.index("int ICACHE_FLASH_ATTR webServerSetupWriteFlash")
         end = source.index("// multipart callback", start)
         writer = source[start:end]
@@ -140,7 +140,7 @@ int main(void) {
                 flash_layout.header(flash_layout.layout("4MB"))
             )
             (temp / "test.c").write_text(
-                '#include "' + str(ROOT / "src/core/flash_layout.c") + '"\n' + writer + code
+                '#include "' + str(ROOT / "src/flash/flash_layout.c") + '"\n' + writer + code
             )
             subprocess.run(
                 [

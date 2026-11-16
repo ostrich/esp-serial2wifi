@@ -84,7 +84,7 @@ with tempfile.TemporaryDirectory(dir=out) as temporary:
         (ROOT / "src/espfs/espfs.c").read_text()
         + "\n"
         + "\n".join(
-            (ROOT / "src/core" / name).read_text()
+            (ROOT / ("src/core" if name == "operation.c" else "src/flash") / name).read_text()
             for name in (
                 "operation.c",
                 "flash_layout.c",
@@ -116,6 +116,11 @@ with tempfile.TemporaryDirectory(dir=out) as temporary:
             "-Wno-misleading-indentation",
             "-I" + str(work),
             "-I" + str(ROOT / "src/core"),
+            "-I" + str(ROOT / "src/api"),
+            "-I" + str(ROOT / "src/wifi"),
+            "-I" + str(ROOT / "src/flash"),
+            "-I" + str(ROOT / "src/programmer"),
+            "-I" + str(ROOT / "src/custom_pages"),
             "-I" + str(ROOT / "src/espfs"),
             "-I" + str(ROOT / "src/serial"),
             "-I" + str(ROOT / "tests/support/api-stubs"),
